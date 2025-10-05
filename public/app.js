@@ -79,24 +79,57 @@ function populateStartOptions(select) {
   }
 }
 
+function startOfDay(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function addDays(date, amount) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + amount);
+  return d;
+}
+
+function toISODate(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function isSameDay(a, b) {
+  return a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+}
+
 /* ----------------- CLIENT ----------------- */
 async function initClient() {
   const pistaSelect = document.getElementById('pistaSelect');
   const dateInput = document.getElementById('dateInput');
   const btnLoad = document.getElementById('btnLoad');
-  const calendarSection = document.getElementById('calendarSection');
+  const dayStrip = document.getElementById('dayStrip');
+  const btnPrevDays = document.getElementById('btnPrevDays');
+  const btnNextDays = document.getElementById('btnNextDays');
+  const onlyAvailableToggle = document.getElementById('onlyAvailableToggle');
+  const hoursGrid = document.getElementById('hoursGrid');
+  const calendarTitle = document.getElementById('calendarTitle');
+  const calendarSubtitle = document.getElementById('calendarSubtitle');
   const reserveForm = document.getElementById('reserveForm');
   const resPista = document.getElementById('resPista');
   const resStartSelect = document.getElementById('resStart');
+  const selectedHourDisplay = document.getElementById('selectedHourDisplay');
   const formMsg = document.getElementById('formMsg');
 
-  populateStartOptions(resStartSelect);
-  if (resStartSelect.options.length > 0) {
-    resStartSelect.value = resStartSelect.options[0].value;
-  }
+  const weekdayFormatter = new Intl.DateTimeFormat('es-ES', { weekday: 'short' });
+  const monthFormatter = new Intl.DateTimeFormat('es-ES', { month: 'short' });
+  const titleFormatter = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 
-  const today = new Date();
-  dateInput.value = today.toISOString().slice(0, 10);
+  const hourDisplayDefault = selectedHourDisplay ? selectedHourDisplay.textContent : '';
+  let stripStartDate = startOfDay(new Date());
+  let selectedDate = startOfDay(new Date());
+  let selectedHour = '';
+
+  populateStartOptions(resStartSelect);
+  resStartSelect.selectedIndex = -1;
 
   const pistas = await fetch(API_BASE + '/pistas').then(r => r.json());
   pistaSelect.innerHTML = '';
@@ -108,15 +141,85 @@ async function initClient() {
   });
 
   if (pistas.length > 0) {
+    pistaSelect.value = pistas[0].id;
     resPista.value = pistas[0].id;
+  }
+
+  syncDateInput();
+
+  function syncDateInput() {
+    if (!dateInput) return '';
+    const iso = toISODate(selectedDate);
+    if (dateInput.value !== iso) {
+      dateInput.value = iso;
+    }
+    return iso;
+  }
+
+  function adoptDateInputValue() {
+    if (!dateInput || !dateInput.value) return false;
+    const parsed = new Date(dateInput.value + 'T00:00:00');
+    if (Number.isNaN(parsed.valueOf())) return false;
+    selectedDate = startOfDay(parsed);
+    if (selectedDate < stripStartDate || selectedDate > addDays(stripStartDate, 6)) {
+      stripStartDate = startOfDay(parsed);
+    }
+    return true;
   }
 
   pistaSelect.addEventListener('change', () => {
     resPista.value = pistaSelect.value;
+    clearSelectedHour();
     loadCalendar();
   });
-  dateInput.addEventListener('change', () => loadCalendar());
-  btnLoad.addEventListener('click', () => loadCalendar());
+  btnLoad.addEventListener('click', () => {
+    if (adoptDateInputValue()) {
+      renderDayStrip();
+      clearSelectedHour();
+    }
+    loadCalendar();
+  });
+  dateInput.addEventListener('change', () => {
+    if (adoptDateInputValue()) {
+      renderDayStrip();
+      clearSelectedHour();
+      loadCalendar();
+    }
+  });
+  onlyAvailableToggle?.addEventListener('change', () => loadCalendar());
+  resStartSelect.addEventListener('change', () => {
+    const value = resStartSelect.value;
+    if (!value) {
+      clearSelectedHour();
+      return;
+    }
+    const option = resStartSelect.selectedOptions[0];
+    if (option?.disabled) {
+      resStartSelect.selectedIndex = -1;
+      clearSelectedHour();
+      return;
+    }
+    selectedHour = value;
+    updateSelectedHourDisplay();
+    updateSelectedHourHighlight();
+  });
+
+  btnPrevDays?.addEventListener('click', () => {
+    stripStartDate = addDays(stripStartDate, -7);
+    selectedDate = addDays(selectedDate, -7);
+    syncDateInput();
+    renderDayStrip();
+    clearSelectedHour();
+    loadCalendar();
+  });
+  btnNextDays?.addEventListener('click', () => {
+    stripStartDate = addDays(stripStartDate, 7);
+    selectedDate = addDays(selectedDate, 7);
+    syncDateInput();
+    renderDayStrip();
+    clearSelectedHour();
+    loadCalendar();
+  });
 
   reserveForm.addEventListener('submit', async (ev) => {
     ev.preventDefault();
@@ -157,9 +260,10 @@ async function initClient() {
         formMsg.textContent = 'Reserva creada correctamente';
         reserveForm.reset();
         resPista.value = pistaSelect.value;
-        if (resStartSelect.options.length > 0) {
-          resStartSelect.value = resStartSelect.options[0].value;
-        }
+        resStartSelect.selectedIndex = -1;
+        selectedHour = '';
+        updateSelectedHourDisplay();
+        updateSelectedHourHighlight();
         loadCalendar();
       } else {
         const err = await resp.json();
@@ -171,47 +275,165 @@ async function initClient() {
     }
   });
 
-  async function loadCalendar() {
-    calendarSection.innerHTML = 'Cargando...';
-    const pistaId = pistaSelect.value;
-    const date = dateInput.value;
-    const reservas = await fetch(`${API_BASE}/reservas?pistaId=${encodeURIComponent(pistaId)}&date=${date}`).then(r => r.json());
-    calendarSection.innerHTML = '';
-
-    const title = document.createElement('h2');
-    const pistaName = pistaSelect.options[pistaSelect.selectedIndex]?.text || '';
-    title.textContent = `Pista: ${pistaName} - ${date}`;
-    calendarSection.appendChild(title);
-
-    for (let h = START_HOUR; h < END_HOUR; h++) {
-      const hourLabel = String(h).padStart(2, '0');
-      const slotStartDate = zonedDateTimeToUtc(date, `${hourLabel}:00`, FACILITY_TZ);
-      const slotEndDate = zonedDateTimeToUtc(date, `${hourLabel}:00`, FACILITY_TZ);
-      slotEndDate.setHours(slotEndDate.getHours() + 1);
-      const slotIsoStart = slotStartDate.toISOString();
-      const slotIsoEnd = slotEndDate.toISOString();
-
-      const overlapping = reservas.filter(r => !(slotIsoEnd <= r.start || slotIsoStart >= r.end));
-      const div = document.createElement('div');
-      div.className = 'slot ' + (overlapping.length ? 'reserved' : 'available');
-      const timeLabel = document.createElement('div');
-      timeLabel.textContent = `${hourLabel}:00 - ${String(h + 1).padStart(2, '0')}:00`;
-      div.appendChild(timeLabel);
-
-      if (overlapping.length) {
-        const info = document.createElement('div');
-        info.innerHTML = overlapping.map(r => `<div><strong>${r.nombre}</strong> (${formatFacilityTime(r.start)} - ${formatFacilityTime(r.end)})</div>`).join('');
-        div.appendChild(info);
-      } else {
-        const info = document.createElement('div');
-        info.textContent = 'Libre';
-        div.appendChild(info);
-      }
-      calendarSection.appendChild(div);
+  function updateSelectedHourDisplay() {
+    if (!selectedHourDisplay) return;
+    if (selectedHour) {
+      selectedHourDisplay.textContent = `Hora seleccionada: ${selectedHour}`;
+      selectedHourDisplay.classList.add('is-active');
+    } else {
+      selectedHourDisplay.textContent = hourDisplayDefault;
+      selectedHourDisplay.classList.remove('is-active');
     }
   }
 
-  loadCalendar();
+  function updateSelectedHourHighlight() {
+    if (!hoursGrid) return;
+    const buttons = hoursGrid.querySelectorAll('.slot-btn');
+    buttons.forEach(btn => {
+      if (btn.dataset.time === selectedHour) {
+        btn.classList.add('is-selected');
+        btn.setAttribute('aria-pressed', 'true');
+      } else {
+        btn.classList.remove('is-selected');
+        btn.setAttribute('aria-pressed', 'false');
+      }
+    });
+  }
+
+  function clearSelectedHour() {
+    selectedHour = '';
+    resStartSelect.selectedIndex = -1;
+    updateSelectedHourDisplay();
+    updateSelectedHourHighlight();
+  }
+
+  function renderDayStrip() {
+    if (!dayStrip) return;
+    dayStrip.innerHTML = '';
+    for (let i = 0; i < 7; i++) {
+      const dayDate = startOfDay(addDays(stripStartDate, i));
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'day-pill';
+      btn.dataset.date = toISODate(dayDate);
+      const dow = weekdayFormatter.format(dayDate).replace('.', '').toUpperCase();
+      const month = monthFormatter.format(dayDate).replace('.', '');
+      btn.innerHTML = `<span class="day-pill__dow">${dow}</span><span class="day-pill__day">${String(dayDate.getDate()).padStart(2, '0')}</span><span class="day-pill__month">${month}</span>`;
+      if (isSameDay(dayDate, selectedDate)) {
+        btn.classList.add('is-active');
+      }
+      btn.addEventListener('click', () => {
+        selectedDate = startOfDay(dayDate);
+        syncDateInput();
+        renderDayStrip();
+        clearSelectedHour();
+        loadCalendar();
+      });
+      dayStrip.appendChild(btn);
+    }
+  }
+
+  async function loadCalendar() {
+    if (!hoursGrid) return;
+    const pistaId = pistaSelect.value;
+    const date = syncDateInput();
+    if (!pistaId || !date) {
+      hoursGrid.innerHTML = '<div class="hours-grid__empty">Selecciona una pista para ver la disponibilidad</div>';
+      return;
+    }
+
+    hoursGrid.innerHTML = '<div class="hours-grid__empty">Cargando disponibilidad...</div>';
+    const pistaName = pistaSelect.options[pistaSelect.selectedIndex]?.text || '';
+    const titleText = titleFormatter.format(selectedDate).replace(',', '');
+    if (calendarTitle) {
+      calendarTitle.textContent = titleText.charAt(0).toUpperCase() + titleText.slice(1);
+    }
+    if (calendarSubtitle) {
+      calendarSubtitle.textContent = pistaName ? `Pista seleccionada: ${pistaName}` : '';
+    }
+
+    try {
+      const reservas = await fetch(`${API_BASE}/reservas?pistaId=${encodeURIComponent(pistaId)}&date=${date}`).then(r => r.json());
+      hoursGrid.innerHTML = '';
+      const onlyAvailable = onlyAvailableToggle?.checked;
+      const availableTimes = new Set();
+      const reservedTimes = new Set();
+
+      for (let h = START_HOUR; h < END_HOUR; h++) {
+        const hourLabel = String(h).padStart(2, '0');
+        const slotStartDate = zonedDateTimeToUtc(date, `${hourLabel}:00`, FACILITY_TZ);
+        const slotEndDate = zonedDateTimeToUtc(date, `${hourLabel}:00`, FACILITY_TZ);
+        slotEndDate.setHours(slotEndDate.getHours() + 1);
+        const slotIsoStart = slotStartDate.toISOString();
+        const slotIsoEnd = slotEndDate.toISOString();
+
+        const overlapping = reservas.filter(r => !(slotIsoEnd <= r.start || slotIsoStart >= r.end));
+        const isReserved = overlapping.length > 0;
+        if (isReserved) {
+          reservedTimes.add(`${hourLabel}:00`);
+        }
+        if (isReserved && onlyAvailable) {
+          continue;
+        }
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'slot-btn';
+        btn.dataset.time = `${hourLabel}:00`;
+        btn.textContent = `${hourLabel}:00`;
+
+        if (isReserved) {
+          btn.disabled = true;
+          btn.classList.add('is-reserved');
+          btn.title = overlapping.map(r => `${r.nombre} (${formatFacilityTime(r.start)} - ${formatFacilityTime(r.end)})`).join('\n');
+        } else {
+          availableTimes.add(btn.dataset.time);
+          btn.addEventListener('click', () => {
+            selectedHour = btn.dataset.time;
+            resStartSelect.value = selectedHour;
+            updateSelectedHourDisplay();
+            updateSelectedHourHighlight();
+          });
+        }
+
+        hoursGrid.appendChild(btn);
+      }
+
+      if (!hoursGrid.children.length) {
+        hoursGrid.innerHTML = '<div class="hours-grid__empty">No hay horarios disponibles para este día</div>';
+      }
+
+      updateStartSelectAvailability(resStartSelect, availableTimes, reservedTimes);
+
+      if (selectedHour && !availableTimes.has(selectedHour)) {
+        clearSelectedHour();
+      } else {
+        updateSelectedHourHighlight();
+        updateSelectedHourDisplay();
+      }
+    } catch (err) {
+      console.error(err);
+      hoursGrid.innerHTML = '<div class="hours-grid__empty">No se pudo cargar la disponibilidad</div>';
+    }
+  }
+
+  renderDayStrip();
+  updateSelectedHourDisplay();
+  await loadCalendar();
+}
+
+function updateStartSelectAvailability(selectEl, availableTimes, reservedTimes) {
+  if (!selectEl) return;
+  Array.from(selectEl.options).forEach(opt => {
+    if (!opt.value) return;
+    if (reservedTimes.has(opt.value)) {
+      opt.disabled = true;
+      opt.classList.add('is-reserved');
+    } else {
+      opt.disabled = false;
+      opt.classList.remove('is-reserved');
+    }
+  });
 }
 
 /* ----------------- ADMIN ----------------- */
