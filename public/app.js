@@ -8,8 +8,20 @@ const facilityDateFormatter = new Intl.DateTimeFormat('en-CA', {
   month: '2-digit',
   day: '2-digit'
 });
-const START_HOUR = 8;
-const END_HOUR = 21;
+const defaultClientConfig = {
+  startMinutes: 16 * 60,
+  endMinutes: 22 * 60,
+  slotMinutes: 30,
+  services: [
+    { id: 'barba', name: 'Barba', durationMin: 30 },
+    { id: 'corte', name: 'Corte', durationMin: 60 },
+    { id: 'barba-corte', name: 'Barba y corte', durationMin: 90 }
+  ]
+};
+const rawClientConfig = typeof window !== 'undefined' ? window.__PELUQUERIA_CONFIG__ : undefined;
+const CLIENT_CONFIG = buildClientConfig(rawClientConfig);
+const CLIENT_TIME_SLOTS = buildTimeSlots(CLIENT_CONFIG);
+const CLIENT_SLOT_INDEX = new Map(CLIENT_TIME_SLOTS.map((slot, index) => [slot.value, index]));
 
 document.addEventListener('DOMContentLoaded', () => {
   const page = document.body.id;
@@ -74,15 +86,123 @@ function formatFacilityDateTime(iso) {
   }).format(new Date(iso));
 }
 
+function buildClientConfig(rawConfig = {}) {
+  const parsedStart = Number(rawConfig.startMinutes);
+  const parsedEnd = Number(rawConfig.endMinutes);
+  const parsedSlot = Number(rawConfig.slotMinutes);
+  const config = {
+    startMinutes: Number.isFinite(parsedStart) ? parsedStart : defaultClientConfig.startMinutes,
+    endMinutes: Number.isFinite(parsedEnd) ? parsedEnd : defaultClientConfig.endMinutes,
+    slotMinutes: Number.isFinite(parsedSlot) ? parsedSlot : defaultClientConfig.slotMinutes,
+    services: defaultClientConfig.services.map(service => ({
+      id: service.id,
+      name: service.name,
+      durationMin: service.durationMin,
+      label: `${service.name} (${service.durationMin} min)`
+    }))
+  };
+
+  if (Array.isArray(rawConfig.services) && rawConfig.services.length) {
+    const normalized = rawConfig.services
+      .map(service => normalizeServiceConfig(service, config.slotMinutes))
+      .filter(Boolean);
+    if (normalized.length) {
+      config.services = normalized;
+    }
+  }
+
+  return config;
+}
+
+function normalizeServiceConfig(service, fallbackSlotMinutes) {
+  if (!service || typeof service !== 'object') return null;
+  const id = typeof service.id === 'string' && service.id
+    ? service.id
+    : typeof service.key === 'string' && service.key
+      ? service.key
+      : typeof service.name === 'string' && service.name
+        ? service.name.toLowerCase().replace(/\s+/g, '-')
+        : null;
+  if (!id) return null;
+  const duration = Number(service.durationMin ?? service.duration ?? service.minutes ?? fallbackSlotMinutes);
+  const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : fallbackSlotMinutes;
+  const name = typeof service.name === 'string' && service.name.trim().length
+    ? service.name.trim()
+    : (typeof service.label === 'string' && service.label.trim().length
+      ? service.label.trim()
+      : id);
+  const label = typeof service.label === 'string' && service.label.trim().length
+    ? service.label.trim()
+    : `${name} (${safeDuration} min)`;
+
+  return { id, name, label, durationMin: safeDuration };
+}
+
+function minutesToTime(totalMinutes) {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function buildTimeSlots(config) {
+  const slots = [];
+  for (let minutes = config.startMinutes; minutes < config.endMinutes; minutes += config.slotMinutes) {
+    slots.push({ value: minutesToTime(minutes), minutes });
+  }
+  return slots;
+}
+
+function getServiceById(serviceId) {
+  return CLIENT_CONFIG.services.find(service => service.id === serviceId) || null;
+}
+
+function getServiceDuration(serviceId) {
+  const service = getServiceById(serviceId);
+  return service ? service.durationMin : CLIENT_CONFIG.slotMinutes;
+}
+
+function getServiceLabel(serviceId) {
+  const service = getServiceById(serviceId);
+  return service ? service.name : '';
+}
+
+function getRequiredSlotCount(durationMin) {
+  return Math.max(1, Math.ceil(durationMin / CLIENT_CONFIG.slotMinutes));
+}
+
+function isStartTimeAvailableForService(startTime, slotAvailability, serviceId) {
+  const durationMin = getServiceDuration(serviceId);
+  const requiredSlots = getRequiredSlotCount(durationMin);
+  const startIndex = CLIENT_SLOT_INDEX.get(startTime);
+  if (startIndex === undefined) return false;
+  for (let i = 0; i < requiredSlots; i++) {
+    const slot = CLIENT_TIME_SLOTS[startIndex + i];
+    if (!slot) return false;
+    if (!slotAvailability[slot.value]) return false;
+  }
+  return true;
+}
+
+function populateServiceOptions(select) {
+  if (!select) return;
+  select.innerHTML = '';
+  CLIENT_CONFIG.services.forEach(service => {
+    const opt = document.createElement('option');
+    opt.value = service.id;
+    opt.textContent = service.label;
+    opt.dataset.durationMin = service.durationMin;
+    select.appendChild(opt);
+  });
+}
+
 function populateStartOptions(select) {
   select.innerHTML = '';
-  for (let h = START_HOUR; h < END_HOUR; h++) {
-    const value = String(h).padStart(2, '0') + ':00';
+  CLIENT_TIME_SLOTS.forEach(slot => {
     const opt = document.createElement('option');
-    opt.value = value;
-    opt.textContent = value;
+    opt.value = slot.value;
+    opt.textContent = slot.value;
     select.appendChild(opt);
-  }
+  });
 }
 
 function getFacilityDateParts(date) {
@@ -136,6 +256,7 @@ async function initClient() {
   const reserveForm = document.getElementById('reserveForm');
   const resPista = document.getElementById('resPista');
   const resStartSelect = document.getElementById('resStart');
+  const resServiceSelect = document.getElementById('resService');
   const selectedHourDisplay = document.getElementById('selectedHourDisplay');
   const formMsg = document.getElementById('formMsg');
 
@@ -149,13 +270,18 @@ async function initClient() {
   let stripStartDate = today;
   let selectedDate = today;
   let selectedHour = '';
+  let latestSlotAvailability = {};
 
   function getDayNavigationStep() {
     return window.matchMedia('(max-width: 600px)').matches ? 1 : 7;
   }
 
   populateStartOptions(resStartSelect);
+  populateServiceOptions(resServiceSelect);
   resStartSelect.selectedIndex = -1;
+  if (resServiceSelect && resServiceSelect.options.length) {
+    resServiceSelect.value = resServiceSelect.options[0].value;
+  }
 
   setDateInputMin();
 
@@ -244,6 +370,18 @@ async function initClient() {
     updateSelectedHourHighlight();
   });
 
+  resServiceSelect?.addEventListener('change', () => {
+    if (resServiceSelect.value && Object.keys(latestSlotAvailability).length) {
+      updateStartSelectAvailability(resStartSelect, latestSlotAvailability, resServiceSelect.value);
+      if (selectedHour && !isStartTimeAvailableForService(selectedHour, latestSlotAvailability, resServiceSelect.value)) {
+        clearSelectedHour();
+      } else {
+        updateSelectedHourHighlight();
+      }
+    }
+    loadCalendar();
+  });
+
   btnPrevDays?.addEventListener('click', () => {
     const step = getDayNavigationStep();
     stripStartDate = clampToToday(facilityStartOfDay(addDays(stripStartDate, -step)));
@@ -287,10 +425,12 @@ async function initClient() {
     const phone = document.getElementById('resPhone').value.trim();
     const email = document.getElementById('resEmail').value.trim();
     const startTime = resStartSelect.value;
-    const durationMin = Number(document.getElementById('resDuration').value);
+    const serviceId = resServiceSelect?.value || '';
+    const durationMin = getServiceDuration(serviceId);
+    const tipoCorte = getServiceLabel(serviceId);
     const date = dateInput.value;
 
-    if (!pistaId || !name || !startTime || !date) {
+    if (!pistaId || !name || !startTime || !date || !serviceId || !Number.isFinite(durationMin)) {
       formMsg.textContent = 'Rellena los campos obligatorios';
       return;
     }
@@ -302,7 +442,9 @@ async function initClient() {
       durationMin,
       nombre: name,
       telefono: phone,
-      email
+      email,
+      tipoCorte: tipoCorte || serviceId,
+      servicioId: serviceId
     };
 
     try {
@@ -317,11 +459,17 @@ async function initClient() {
         reserveForm.reset();
         resPista.value = pistaSelect.value;
         resStartSelect.selectedIndex = -1;
+        if (resServiceSelect && resServiceSelect.options.length) {
+          resServiceSelect.value = resServiceSelect.options[0].value;
+        }
         selectedHour = '';
         setDateInputMin();
         syncDateInput();
         updateSelectedHourDisplay();
         updateSelectedHourHighlight();
+        if (Object.keys(latestSlotAvailability).length && resServiceSelect) {
+          updateStartSelectAvailability(resStartSelect, latestSlotAvailability, resServiceSelect.value);
+        }
         loadCalendar();
       } else {
         const err = await resp.json();
@@ -402,7 +550,7 @@ async function initClient() {
     const pistaId = pistaSelect.value;
     const date = syncDateInput();
     if (!pistaId || !date) {
-      hoursGrid.innerHTML = '<div class="hours-grid__empty">Selecciona una pista para ver la disponibilidad</div>';
+      hoursGrid.innerHTML = '<div class="hours-grid__empty">Selecciona la peluquería para ver la disponibilidad</div>';
       return;
     }
 
@@ -413,45 +561,53 @@ async function initClient() {
       calendarTitle.textContent = titleText.charAt(0).toUpperCase() + titleText.slice(1);
     }
     if (calendarSubtitle) {
-      calendarSubtitle.textContent = pistaName ? `Pista seleccionada: ${pistaName}` : '';
+      calendarSubtitle.textContent = pistaName ? `Peluquería seleccionada: ${pistaName}` : '';
     }
 
     try {
       const reservas = await fetch(`${API_BASE}/reservas?pistaId=${encodeURIComponent(pistaId)}&date=${date}`).then(r => r.json());
       hoursGrid.innerHTML = '';
       const onlyAvailable = onlyAvailableToggle?.checked;
-      const availableTimes = new Set();
-      const reservedTimes = new Set();
-
-      for (let h = START_HOUR; h < END_HOUR; h++) {
-        const hourLabel = String(h).padStart(2, '0');
-        const slotStartDate = zonedDateTimeToUtc(date, `${hourLabel}:00`, FACILITY_TZ);
-        const slotEndDate = zonedDateTimeToUtc(date, `${hourLabel}:00`, FACILITY_TZ);
-        slotEndDate.setHours(slotEndDate.getHours() + 1);
+      const slotAvailability = {};
+      const slotDetails = CLIENT_TIME_SLOTS.map(slot => {
+        const slotStartDate = zonedDateTimeToUtc(date, slot.value, FACILITY_TZ);
+        const slotEndDate = new Date(slotStartDate.getTime() + CLIENT_CONFIG.slotMinutes * 60000);
         const slotIsoStart = slotStartDate.toISOString();
         const slotIsoEnd = slotEndDate.toISOString();
-
         const overlapping = reservas.filter(r => !(slotIsoEnd <= r.start || slotIsoStart >= r.end));
         const isReserved = overlapping.length > 0;
-        if (isReserved) {
-          reservedTimes.add(`${hourLabel}:00`);
-        }
-        if (isReserved && onlyAvailable) {
-          continue;
+        slotAvailability[slot.value] = !isReserved;
+        return { slot, isReserved, overlapping };
+      });
+
+      const currentServiceId = resServiceSelect?.value || CLIENT_CONFIG.services[0]?.id || '';
+
+      slotDetails.forEach(({ slot, isReserved, overlapping }) => {
+        const startTime = slot.value;
+        const canBook = !isReserved && currentServiceId
+          ? isStartTimeAvailableForService(startTime, slotAvailability, currentServiceId)
+          : !isReserved;
+
+        if (onlyAvailable && !canBook) {
+          return;
         }
 
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'slot-btn';
-        btn.dataset.time = `${hourLabel}:00`;
-        btn.textContent = `${hourLabel}:00`;
+        btn.dataset.time = startTime;
+        btn.textContent = startTime;
 
-        if (isReserved) {
+        if (!canBook) {
           btn.disabled = true;
-          btn.classList.add('is-reserved');
-          btn.title = overlapping.map(r => `${r.nombre} (${formatFacilityTime(r.start)} - ${formatFacilityTime(r.end)})`).join('\n');
+          if (isReserved) {
+            btn.classList.add('is-reserved');
+            btn.title = overlapping.map(r => `${r.nombre} (${formatFacilityTime(r.start)} - ${formatFacilityTime(r.end)})`).join('\n');
+          } else {
+            btn.classList.add('is-unavailable');
+            btn.title = 'No hay tiempo suficiente para el servicio seleccionado';
+          }
         } else {
-          availableTimes.add(btn.dataset.time);
           btn.addEventListener('click', () => {
             selectedHour = btn.dataset.time;
             resStartSelect.value = selectedHour;
@@ -461,15 +617,18 @@ async function initClient() {
         }
 
         hoursGrid.appendChild(btn);
-      }
+      });
 
       if (!hoursGrid.children.length) {
         hoursGrid.innerHTML = '<div class="hours-grid__empty">No hay horarios disponibles para este día</div>';
       }
 
-      updateStartSelectAvailability(resStartSelect, availableTimes, reservedTimes);
+      latestSlotAvailability = slotAvailability;
+      if (resServiceSelect) {
+        updateStartSelectAvailability(resStartSelect, slotAvailability, currentServiceId);
+      }
 
-      if (selectedHour && !availableTimes.has(selectedHour)) {
+      if (selectedHour && !isStartTimeAvailableForService(selectedHour, slotAvailability, currentServiceId)) {
         clearSelectedHour();
       } else {
         updateSelectedHourHighlight();
@@ -477,6 +636,7 @@ async function initClient() {
       }
     } catch (err) {
       console.error(err);
+      latestSlotAvailability = {};
       hoursGrid.innerHTML = '<div class="hours-grid__empty">No se pudo cargar la disponibilidad</div>';
     }
   }
@@ -486,16 +646,28 @@ async function initClient() {
   await loadCalendar();
 }
 
-function updateStartSelectAvailability(selectEl, availableTimes, reservedTimes) {
+function updateStartSelectAvailability(selectEl, slotAvailability, serviceId) {
   if (!selectEl) return;
+  const availability = slotAvailability || {};
   Array.from(selectEl.options).forEach(opt => {
     if (!opt.value) return;
-    if (reservedTimes.has(opt.value)) {
-      opt.disabled = true;
-      opt.classList.add('is-reserved');
-    } else {
+    const baseAvailable = Boolean(availability[opt.value]);
+    const canBook = serviceId
+      ? isStartTimeAvailableForService(opt.value, availability, serviceId)
+      : baseAvailable;
+
+    if (canBook) {
       opt.disabled = false;
-      opt.classList.remove('is-reserved');
+      opt.classList.remove('is-reserved', 'is-unavailable');
+    } else {
+      opt.disabled = true;
+      if (!baseAvailable) {
+        opt.classList.add('is-reserved');
+        opt.classList.remove('is-unavailable');
+      } else {
+        opt.classList.add('is-unavailable');
+        opt.classList.remove('is-reserved');
+      }
     }
   });
 }
