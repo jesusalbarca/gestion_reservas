@@ -108,6 +108,22 @@ function isValidTime(time) {
 
 }
 
+function getTodayIsoDate(timeZone) {
+
+  return new Intl.DateTimeFormat('en-CA', {
+
+    timeZone,
+
+    year: 'numeric',
+
+    month: '2-digit',
+
+    day: '2-digit'
+
+  }).format(new Date());
+
+}
+
 /* ---- RUTAS PUBLICAS (cliente) ---- */
 
 app.get('/api/pistas', async (req, res) => {
@@ -159,6 +175,14 @@ app.post('/api/reservas', async (req, res) => {
     if (!isValidDate(date)) {
 
       return res.status(400).json({ error: 'Formato de fecha invalido (YYYY-MM-DD).' });
+
+    }
+
+    const todayIso = getTodayIsoDate(FACILITY_TZ);
+
+    if (date < todayIso) {
+
+      return res.status(400).json({ error: 'La fecha debe ser igual o posterior a la fecha actual del centro.' });
 
     }
 
