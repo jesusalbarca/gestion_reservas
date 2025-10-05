@@ -2,6 +2,12 @@
 // Client and admin behaviour for the booking prototype
 const API_BASE = '/api';
 const FACILITY_TZ = 'Europe/Madrid';
+const facilityDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: FACILITY_TZ,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit'
+});
 const START_HOUR = 8;
 const END_HOUR = 21;
 
@@ -79,10 +85,20 @@ function populateStartOptions(select) {
   }
 }
 
+function getFacilityDateParts(date) {
+  const parts = facilityDateFormatter.formatToParts(date);
+  const result = { year: '0000', month: '00', day: '00' };
+  for (const part of parts) {
+    if (part.type === 'year') result.year = part.value;
+    if (part.type === 'month') result.month = part.value;
+    if (part.type === 'day') result.day = part.value;
+  }
+  return result;
+}
+
 function startOfDay(date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  const { year, month, day } = getFacilityDateParts(date);
+  return new Date(Number(year), Number(month) - 1, Number(day));
 }
 
 function addDays(date, amount) {
@@ -92,16 +108,17 @@ function addDays(date, amount) {
 }
 
 function toISODate(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  const { year, month, day } = getFacilityDateParts(date);
   return `${year}-${month}-${day}`;
 }
 
+function facilityStartOfDay(date) {
+  const isoDate = toISODate(date);
+  return zonedDateTimeToUtc(isoDate, '00:00', FACILITY_TZ);
+}
+
 function isSameDay(a, b) {
-  return a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate();
+  return toISODate(a) === toISODate(b);
 }
 
 /* ----------------- CLIENT ----------------- */
@@ -122,13 +139,13 @@ async function initClient() {
   const selectedHourDisplay = document.getElementById('selectedHourDisplay');
   const formMsg = document.getElementById('formMsg');
 
-  const weekdayFormatter = new Intl.DateTimeFormat('es-ES', { weekday: 'short' });
-  const monthFormatter = new Intl.DateTimeFormat('es-ES', { month: 'short' });
-  const titleFormatter = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+  const weekdayFormatter = new Intl.DateTimeFormat('es-ES', { weekday: 'short', timeZone: FACILITY_TZ });
+  const monthFormatter = new Intl.DateTimeFormat('es-ES', { month: 'short', timeZone: FACILITY_TZ });
+  const titleFormatter = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long', timeZone: FACILITY_TZ });
 
   const hourDisplayDefault = selectedHourDisplay ? selectedHourDisplay.textContent : '';
-  let stripStartDate = startOfDay(new Date());
-  let selectedDate = startOfDay(new Date());
+  let stripStartDate = facilityStartOfDay(new Date());
+  let selectedDate = facilityStartOfDay(new Date());
   let selectedHour = '';
 
   populateStartOptions(resStartSelect);
@@ -163,9 +180,9 @@ async function initClient() {
     if (!dateInput || !dateInput.value) return false;
     const parsed = new Date(dateInput.value + 'T00:00:00');
     if (Number.isNaN(parsed.valueOf())) return false;
-    selectedDate = startOfDay(parsed);
+    selectedDate = facilityStartOfDay(parsed);
     if (selectedDate < stripStartDate || selectedDate > addDays(stripStartDate, 6)) {
-      stripStartDate = startOfDay(parsed);
+      stripStartDate = selectedDate;
     }
     return true;
   }
@@ -208,16 +225,16 @@ async function initClient() {
   });
 
   btnPrevDays?.addEventListener('click', () => {
-    stripStartDate = addDays(stripStartDate, -7);
-    selectedDate = addDays(selectedDate, -7);
+    stripStartDate = facilityStartOfDay(addDays(stripStartDate, -7));
+    selectedDate = facilityStartOfDay(addDays(selectedDate, -7));
     syncDateInput();
     renderDayStrip();
     clearSelectedHour();
     loadCalendar();
   });
   btnNextDays?.addEventListener('click', () => {
-    stripStartDate = addDays(stripStartDate, 7);
-    selectedDate = addDays(selectedDate, 7);
+    stripStartDate = facilityStartOfDay(addDays(stripStartDate, 7));
+    selectedDate = facilityStartOfDay(addDays(selectedDate, 7));
     syncDateInput();
     renderDayStrip();
     clearSelectedHour();
@@ -314,19 +331,21 @@ async function initClient() {
     if (!dayStrip) return;
     dayStrip.innerHTML = '';
     for (let i = 0; i < 7; i++) {
-      const dayDate = startOfDay(addDays(stripStartDate, i));
+      const dayDate = addDays(stripStartDate, i);
+      const parts = getFacilityDateParts(dayDate);
+      const isoDate = `${parts.year}-${parts.month}-${parts.day}`;
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'day-pill';
-      btn.dataset.date = toISODate(dayDate);
+      btn.dataset.date = isoDate;
       const dow = weekdayFormatter.format(dayDate).replace('.', '').toUpperCase();
       const month = monthFormatter.format(dayDate).replace('.', '');
-      btn.innerHTML = `<span class="day-pill__dow">${dow}</span><span class="day-pill__day">${String(dayDate.getDate()).padStart(2, '0')}</span><span class="day-pill__month">${month}</span>`;
+      btn.innerHTML = `<span class="day-pill__dow">${dow}</span><span class="day-pill__day">${parts.day}</span><span class="day-pill__month">${month}</span>`;
       if (isSameDay(dayDate, selectedDate)) {
         btn.classList.add('is-active');
       }
       btn.addEventListener('click', () => {
-        selectedDate = startOfDay(dayDate);
+        selectedDate = facilityStartOfDay(dayDate);
         syncDateInput();
         renderDayStrip();
         clearSelectedHour();
