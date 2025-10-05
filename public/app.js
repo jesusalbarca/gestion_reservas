@@ -143,13 +143,17 @@ async function initClient() {
   const monthFormatter = new Intl.DateTimeFormat('es-ES', { month: 'short', timeZone: FACILITY_TZ });
   const titleFormatter = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long', timeZone: FACILITY_TZ });
 
+  const today = facilityStartOfDay(new Date());
+  const todayIso = toISODate(today);
   const hourDisplayDefault = selectedHourDisplay ? selectedHourDisplay.textContent : '';
-  let stripStartDate = facilityStartOfDay(new Date());
-  let selectedDate = facilityStartOfDay(new Date());
+  let stripStartDate = today;
+  let selectedDate = today;
   let selectedHour = '';
 
   populateStartOptions(resStartSelect);
   resStartSelect.selectedIndex = -1;
+
+  setDateInputMin();
 
   const pistas = await fetch(API_BASE + '/pistas').then(r => r.json());
   pistaSelect.innerHTML = '';
@@ -167,6 +171,16 @@ async function initClient() {
 
   syncDateInput();
 
+  function clampToToday(date) {
+    return date < today ? today : date;
+  }
+
+  function setDateInputMin() {
+    if (dateInput) {
+      dateInput.min = todayIso;
+    }
+  }
+
   function syncDateInput() {
     if (!dateInput) return '';
     const iso = toISODate(selectedDate);
@@ -180,10 +194,12 @@ async function initClient() {
     if (!dateInput || !dateInput.value) return false;
     const parsed = new Date(dateInput.value + 'T00:00:00');
     if (Number.isNaN(parsed.valueOf())) return false;
-    selectedDate = facilityStartOfDay(parsed);
+    selectedDate = clampToToday(facilityStartOfDay(parsed));
     if (selectedDate < stripStartDate || selectedDate > addDays(stripStartDate, 6)) {
       stripStartDate = selectedDate;
     }
+    stripStartDate = clampToToday(stripStartDate);
+    syncDateInput();
     return true;
   }
 
@@ -225,8 +241,11 @@ async function initClient() {
   });
 
   btnPrevDays?.addEventListener('click', () => {
-    stripStartDate = facilityStartOfDay(addDays(stripStartDate, -7));
-    selectedDate = facilityStartOfDay(addDays(selectedDate, -7));
+    stripStartDate = clampToToday(facilityStartOfDay(addDays(stripStartDate, -7)));
+    selectedDate = clampToToday(facilityStartOfDay(addDays(selectedDate, -7)));
+    if (selectedDate < stripStartDate) {
+      selectedDate = stripStartDate;
+    }
     syncDateInput();
     renderDayStrip();
     clearSelectedHour();
@@ -235,6 +254,9 @@ async function initClient() {
   btnNextDays?.addEventListener('click', () => {
     stripStartDate = facilityStartOfDay(addDays(stripStartDate, 7));
     selectedDate = facilityStartOfDay(addDays(selectedDate, 7));
+    if (selectedDate < stripStartDate) {
+      selectedDate = stripStartDate;
+    }
     syncDateInput();
     renderDayStrip();
     clearSelectedHour();
@@ -282,6 +304,8 @@ async function initClient() {
         resPista.value = pistaSelect.value;
         resStartSelect.selectedIndex = -1;
         selectedHour = '';
+        setDateInputMin();
+        syncDateInput();
         updateSelectedHourDisplay();
         updateSelectedHourHighlight();
         loadCalendar();
@@ -332,6 +356,7 @@ async function initClient() {
     dayStrip.innerHTML = '';
     for (let i = 0; i < 7; i++) {
       const dayDate = addDays(stripStartDate, i);
+      if (dayDate < today) continue;
       const parts = getFacilityDateParts(dayDate);
       const isoDate = `${parts.year}-${parts.month}-${parts.day}`;
       const btn = document.createElement('button');
@@ -352,6 +377,9 @@ async function initClient() {
         loadCalendar();
       });
       dayStrip.appendChild(btn);
+    }
+    if (btnPrevDays) {
+      btnPrevDays.disabled = stripStartDate <= today;
     }
   }
 
