@@ -750,12 +750,16 @@ async function initAdmin() {
       return;
     }
     const container = document.createElement('div');
-    container.innerHTML = reservas.map(r => `<div class="card" style="margin-bottom:8px;">
+    container.innerHTML = reservas.map(r => {
+      const serviceLabel = r.tipoCorte || r.servicioId || '-';
+      return `<div class="card" style="margin-bottom:8px;">
       <div><strong>${r.nombre}</strong> - ${r.pistaId}</div>
+      <div>Servicio: ${serviceLabel}</div>
       <div>${formatFacilityDateTime(r.start)} - ${formatFacilityDateTime(r.end)}</div>
       <div>Email: ${r.email || '-'} Tel: ${r.telefono || '-'}</div>
       <div style="margin-top:6px;"><button data-id="${r.id}" class="delBtn">Eliminar</button></div>
-    </div>`).join('');
+    </div>`;
+    }).join('');
     reservasList.innerHTML = '';
     reservasList.appendChild(container);
 
