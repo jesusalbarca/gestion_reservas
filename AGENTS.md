@@ -27,6 +27,13 @@ pm run init-db is required after merging.
 Set PORT, FACILITY_TZ, or other overrides via process env vars in your shell or a .env file (not committed). Remember the JSON-backed store under data/ is single-user; avoid deploying it as-is to multi-user environments, and add locking or move to a real database if concurrent writes become an issue.
 
 ## Dominio funcional
-- Por un lado está la app cliente, en index.hmtl. 
+- Por un lado está la app cliente, en index.hmtl.
 esta app es para que los usuarios puedan seleccionar distintas pistas para revervar. Una vez en la pista seleccionada, podrán elegir una hora y completar sus datos para reservar.
 - Por otro lado, la app admin es para gestionar las pistas y las reservas, pudiendo eliminarlas
+
+## Notas de navegación de días (Cliente)
+- El cliente utiliza `renderDayStrip` para pintar tiras de 7 días consecutivos a partir de `stripStartDate`. El rango visible se mantiene entre `stripStartDate` y `stripStartDate + 6` días.
+- La función auxiliar `getDayNavigationStep()` (declarada dentro de `initClient` en `public/app.js`) decide cómo avanzan los botones de navegación:
+  - Devuelve `1` cuando `window.matchMedia('(max-width: 600px)')` es verdadero para que, en móviles, los botones avancen o retrocedan día a día manteniendo la continuidad visual.
+  - Devuelve `7` en caso contrario para conservar los saltos semanales en viewport amplios.
+- Los controladores `btnPrevDays` y `btnNextDays` actualizan `stripStartDate` y `selectedDate` usando el paso dinámico, claman las fechas con `clampToToday`, y ajustan `selectedDate` al rango visible (`stripStartDate` a `stripStartDate + 6`). Después de mover el rango se invocan `renderDayStrip`, `clearSelectedHour` y `loadCalendar` para refrescar la UI.

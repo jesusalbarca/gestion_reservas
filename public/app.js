@@ -150,6 +150,10 @@ async function initClient() {
   let selectedDate = today;
   let selectedHour = '';
 
+  function getDayNavigationStep() {
+    return window.matchMedia('(max-width: 600px)').matches ? 1 : 7;
+  }
+
   populateStartOptions(resStartSelect);
   resStartSelect.selectedIndex = -1;
 
@@ -241,10 +245,15 @@ async function initClient() {
   });
 
   btnPrevDays?.addEventListener('click', () => {
-    stripStartDate = clampToToday(facilityStartOfDay(addDays(stripStartDate, -7)));
-    selectedDate = clampToToday(facilityStartOfDay(addDays(selectedDate, -7)));
+    const step = getDayNavigationStep();
+    stripStartDate = clampToToday(facilityStartOfDay(addDays(stripStartDate, -step)));
+    selectedDate = facilityStartOfDay(addDays(selectedDate, -step));
+    selectedDate = clampToToday(selectedDate);
+    const rangeEnd = addDays(stripStartDate, 6);
     if (selectedDate < stripStartDate) {
       selectedDate = stripStartDate;
+    } else if (selectedDate > rangeEnd) {
+      selectedDate = rangeEnd;
     }
     syncDateInput();
     renderDayStrip();
@@ -252,9 +261,14 @@ async function initClient() {
     loadCalendar();
   });
   btnNextDays?.addEventListener('click', () => {
-    stripStartDate = facilityStartOfDay(addDays(stripStartDate, 7));
-    selectedDate = facilityStartOfDay(addDays(selectedDate, 7));
-    if (selectedDate < stripStartDate) {
+    const step = getDayNavigationStep();
+    stripStartDate = clampToToday(facilityStartOfDay(addDays(stripStartDate, step)));
+    selectedDate = facilityStartOfDay(addDays(selectedDate, step));
+    selectedDate = clampToToday(selectedDate);
+    const rangeEnd = addDays(stripStartDate, 6);
+    if (selectedDate > rangeEnd) {
+      selectedDate = rangeEnd;
+    } else if (selectedDate < stripStartDate) {
       selectedDate = stripStartDate;
     }
     syncDateInput();
