@@ -3,61 +3,109 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Reservas - Polideportivo (Cliente)</title>
+  <title>Gestión de reservas de pistas</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body id="page-client">
-  <header>
-    <h1>Reservas - Polideportivo</h1>
-    <nav>
-      <a href="/index.html">Cliente</a> |
-      <a href="/admin.html">Admin</a>
-    </nav>
-  </header>
-
-  <main>
-    <section class="controls">
-      <label>Pista:
-        <select id="pistaSelect"></select>
-      </label>
-      <label>Fecha:
-        <input type="date" id="dateInput" />
-      </label>
-      <button id="btnLoad">Cargar</button>
-    </section>
-
-    <section id="calendarSection">
-      <!-- Calendario simple abajo -->
-    </section>
-
-    <section id="formReserve" class="card">
-      <h3>Reservar</h3>
-      <form id="reserveForm">
-        <input type="hidden" id="resPista" />
-        <label>Nombre: <input type="text" id="resName" required /></label>
-        <label>Telefono: <input type="text" id="resPhone" /></label>
-        <label>Email: <input type="email" id="resEmail" /></label>
-        <label>Hora inicio:
-          <select id="resStart" required></select>
-        </label>
-        <label>Duracion (min):
-          <select id="resDuration">
-            <option value="30">30</option>
-            <option value="60" selected>60</option>
-            <option value="90">90</option>
-          </select>
-        </label>
-        <div>
-          <button type="submit">Reservar</button>
+  <div class="app-wrapper">
+    <header class="hero">
+      <div class="hero__image" aria-hidden="true"></div>
+      <div class="hero__overlay"></div>
+      <div class="hero__content">
+        <div class="hero__back" aria-hidden="true">‹</div>
+        <div class="hero__info">
+          <div class="hero__badge">Agenda</div>
+          <h1>Reserva tu pista deportiva</h1>
+          <p class="hero__address">Consulta la disponibilidad y confirma reservas para cada pista.</p>
+          <div class="hero__tags">
+            <span class="hero__tag">Selecciona pista y horario</span>
+            <span class="hero__tag">Confirmación inmediata</span>
+          </div>
         </div>
-      </form>
-      <div id="formMsg"></div>
-    </section>
-  </main>
+        <nav class="hero__nav">
+          <a href="/index.html" class="hero__nav-link is-active">Reservas</a>
+        </nav>
+      </div>
+    </header>
 
-  <footer>
-    Zona horaria: Europe/Madrid - Prototipo minimalista
-  </footer>
+    <main class="main-grid">
+      <section class="booking card">
+        <div class="booking__controls">
+          <label class="field">
+            <span class="field__label">Pista</span>
+            <select id="pistaSelect" class="field__control"></select>
+          </label>
+          <label class="field field--hidden">
+            <span class="field__label">Fecha</span>
+            <input type="date" id="dateInput" class="field__control" />
+          </label>
+          <button id="btnLoad" class="ghost-btn" type="button">Actualizar</button>
+        </div>
+
+        <div class="day-strip">
+          <button id="btnPrevDays" class="day-strip__nav" type="button" aria-label="Días anteriores">‹</button>
+          <div id="dayStrip" class="day-strip__list"></div>
+          <button id="btnNextDays" class="day-strip__nav" type="button" aria-label="Días siguientes">›</button>
+        </div>
+
+        <div class="availability-toggle">
+          <label class="switch">
+            <input type="checkbox" id="onlyAvailableToggle" />
+            <span class="switch__slider" aria-hidden="true"></span>
+          </label>
+          <span class="availability-toggle__label">Mostrar solo las horas disponibles</span>
+        </div>
+
+        <section id="calendarSection" class="calendar">
+          <div class="calendar__header">
+            <h2 id="calendarTitle"></h2>
+            <p id="calendarSubtitle"></p>
+          </div>
+          <div id="hoursGrid" class="hours-grid"></div>
+        </section>
+      </section>
+
+      <section id="formReserve" class="card reservation">
+        <h3>Completa tu reserva</h3>
+        <form id="reserveForm" class="form">
+          <input type="hidden" id="resPista" />
+          <label class="field">
+            <span class="field__label">Nombre</span>
+            <input type="text" id="resName" required class="field__control" />
+          </label>
+          <label class="field">
+            <span class="field__label">Teléfono</span>
+            <input type="text" id="resPhone" class="field__control" />
+          </label>
+          <label class="field">
+            <span class="field__label">Email</span>
+            <input type="email" id="resEmail" class="field__control" />
+          </label>
+          <label class="field field--hidden">
+            <span class="field__label">Hora inicio</span>
+            <select id="resStart" required class="field__control"></select>
+          </label>
+          <div class="selected-hour" id="selectedHourDisplay">Selecciona una hora disponible en el calendario</div>
+          <label class="field">
+            <span class="field__label">Duración (min)</span>
+            <select id="resDuration" class="field__control">
+              <option value="30">30</option>
+              <option value="60" selected>60</option>
+              <option value="90">90</option>
+            </select>
+          </label>
+          <div class="form__actions">
+            <button type="submit" class="primary-btn">Reservar</button>
+          </div>
+        </form>
+        <div id="formMsg"></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      Zona horaria: Europe/Madrid · Prototipo de reservas
+    </footer>
+  </div>
 
   <script src="/app.js"></script>
 </body>
