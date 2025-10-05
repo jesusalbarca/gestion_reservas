@@ -69,17 +69,7 @@ button {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 24px;
-}
-
-.hero__back {
-  width: 42px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  font-size: 28px;
+  gap: 16px;
 }
 
 .hero__info h1 {
