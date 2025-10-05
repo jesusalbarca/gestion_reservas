@@ -41,6 +41,7 @@ button {
 
 .hero {
   position: relative;
+  z-index: 0;
   min-height: 260px;
   padding: 32px 24px 96px;
   overflow: hidden;
@@ -50,6 +51,7 @@ button {
 .hero__image {
   position: absolute;
   inset: 0;
+  z-index: -2;
   background: radial-gradient(circle at 10% 20%, rgba(56, 189, 248, 0.65), rgba(15, 23, 42, 0.85)),
     linear-gradient(120deg, rgba(14, 165, 233, 0.4), rgba(45, 212, 191, 0.2));
 }
@@ -57,6 +59,7 @@ button {
 .hero__overlay {
   position: absolute;
   inset: 0;
+  z-index: -1;
   background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(15, 118, 110, 0.65) 100%);
 }
 
@@ -144,6 +147,8 @@ button {
 }
 
 .main-grid {
+  position: relative;
+  z-index: 1;
   flex: 1;
   margin-top: -72px;
   padding: 0 16px 48px;
