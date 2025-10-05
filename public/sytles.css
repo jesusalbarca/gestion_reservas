@@ -1,0 +1,23 @@
+/* styles.css */
+:root {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    color: #111;
+    background: #f6f7f9;
+  }
+  body { margin: 0; padding: 0; }
+  header { background: #0b5; padding: 12px 16px; color: #003; }
+  header h1 { margin: 0 0 6px 0; font-size: 1.2rem; }
+  nav a { color: #003; text-decoration: none; margin-right: 8px; font-size: .95rem; }
+  main { padding: 16px; display: grid; gap: 16px; }
+  .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .card { background: white; padding:12px; border-radius:8px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+  #calendarSection { min-height: 220px; }
+  .slot { padding:6px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; }
+  .reserved { background:#ffd; border-left:4px solid #f99; padding-left:8px; }
+  .available { background:#f7fff7; }
+  footer { padding: 12px 16px; font-size: .85rem; color:#333; background: #fff; border-top: 1px solid #eee; margin-top: 16px;}
+  label { display:inline-flex; flex-direction:column; font-size:.9rem; margin-right:8px; }
+  input, select, button { padding:6px 8px; border-radius:6px; border:1px solid #ddd; font-size:.95rem; }
+  button { cursor:pointer; }
+  #formMsg, #pistaMsg { margin-top:8px; color: #c00; }
+  

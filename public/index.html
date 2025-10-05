@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Reservas - Polideportivo (Cliente)</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body id="page-client">
+  <header>
+    <h1>Reservas - Polideportivo</h1>
+    <nav>
+      <a href="/index.html">Cliente</a> |
+      <a href="/admin.html">Admin</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="controls">
+      <label>Pista:
+        <select id="pistaSelect"></select>
+      </label>
+      <label>Fecha:
+        <input type="date" id="dateInput" />
+      </label>
+      <button id="btnLoad">Cargar</button>
+    </section>
+
+    <section id="calendarSection">
+      <!-- Calendario simple abajo -->
+    </section>
+
+    <section id="formReserve" class="card">
+      <h3>Reservar</h3>
+      <form id="reserveForm">
+        <input type="hidden" id="resPista" />
+        <label>Nombre: <input type="text" id="resName" required /></label>
+        <label>Teléfono: <input type="text" id="resPhone" /></label>
+        <label>Email: <input type="email" id="resEmail" /></label>
+        <label>Hora inicio:
+          <input type="time" id="resStart" required />
+        </label>
+        <label>Duración (min): 
+          <select id="resDuration">
+            <option value="30">30</option>
+            <option value="60" selected>60</option>
+            <option value="90">90</option>
+          </select>
+        </label>
+        <div>
+          <button type="submit">Reservar</button>
+        </div>
+      </form>
+      <div id="formMsg"></div>
+    </section>
+  </main>
+
+  <footer>
+    Zona horaria: Europe/Madrid — Prototipo minimalista
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>
