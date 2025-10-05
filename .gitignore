@@ -5,6 +5,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 package-lock.json
+notas.txt
 
 # === Archivos locales de datos ===
 data/

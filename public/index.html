@@ -35,12 +35,12 @@
       <form id="reserveForm">
         <input type="hidden" id="resPista" />
         <label>Nombre: <input type="text" id="resName" required /></label>
-        <label>Teléfono: <input type="text" id="resPhone" /></label>
+        <label>Telefono: <input type="text" id="resPhone" /></label>
         <label>Email: <input type="email" id="resEmail" /></label>
         <label>Hora inicio:
-          <input type="time" id="resStart" required />
+          <select id="resStart" required></select>
         </label>
-        <label>Duración (min): 
+        <label>Duracion (min):
           <select id="resDuration">
             <option value="30">30</option>
             <option value="60" selected>60</option>
@@ -56,9 +56,11 @@
   </main>
 
   <footer>
-    Zona horaria: Europe/Madrid — Prototipo minimalista
+    Zona horaria: Europe/Madrid - Prototipo minimalista
   </footer>
 
   <script src="/app.js"></script>
 </body>
 </html>
+
+

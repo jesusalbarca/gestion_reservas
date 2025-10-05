@@ -1,4 +1,4 @@
-// db.js
+﻿// db.js
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -21,17 +21,16 @@ async function writeDB(data) {
   await fs.writeFile(dbPath, JSON.stringify(data, null, 2), 'utf8');
 }
 
-// Util id simple
 function makeId(prefix = '') {
   return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
-/* Exported API */
 module.exports = {
   async getPistas() {
     const db = await readDB();
     return db.pistas || [];
   },
+
   async addPista({ nombre, descripcion }) {
     const db = await readDB();
     const pista = { id: makeId('PISTA_'), nombre, descripcion: descripcion || '', createdAt: new Date().toISOString() };
@@ -40,6 +39,19 @@ module.exports = {
     await writeDB(db);
     return pista;
   },
+
+  async deletePista(id) {
+    const db = await readDB();
+    const before = (db.pistas || []).length;
+    db.pistas = (db.pistas || []).filter(p => p.id !== id);
+    if (before === db.pistas.length) {
+      return false;
+    }
+    db.reservas = (db.reservas || []).filter(r => r.pistaId !== id);
+    await writeDB(db);
+    return true;
+  },
+
   async getUsuarios() {
     const db = await readDB();
     return db.usuarios || [];
@@ -60,14 +72,24 @@ module.exports = {
     const db = await readDB();
     return (db.reservas || []).filter(r => r.pistaId === pistaId);
   },
-  async addReserva({ pistaId, startISO, endISO, nombre, telefono, email }) {
+  async addReserva({ pistaId, startISO, endISO, nombre, telefono, email, date, startTime, durationMin, timezone }) {
     const db = await readDB();
     db.reservas = db.reservas || [];
+    db.pistas = db.pistas || [];
 
-    // Comprobación simple de solapamientos: same pista
-    const newStart = new Date(startISO).toISOString();
-    const newEnd = new Date(endISO).toISOString();
-    const conflicts = db.reservas.filter(r => r.pistaId === pistaId && (newStart < r.end && newEnd > r.start));
+    if (!db.pistas.some(p => p.id === pistaId)) {
+      const err = new Error('La pista indicada no existe.');
+      err.code = 'INVALID_PISTA';
+      throw err;
+    }
+
+    const newStart = startISO;
+    const newEnd = endISO;
+    const conflicts = db.reservas.filter(r => {
+      if (r.pistaId !== pistaId) return false;
+      if (r.date && date && r.date !== date) return false;
+      return newStart < r.end && newEnd > r.start;
+    });
     if (conflicts.length > 0) {
       const err = new Error('Conflicto de reserva (solapamiento) con otra reserva en la misma pista.');
       err.code = 'CONFLICT';
@@ -77,11 +99,15 @@ module.exports = {
     const reserva = {
       id: makeId('RES_'),
       pistaId,
+      date,
+      startTime,
+      durationMin,
       start: newStart,
       end: newEnd,
       nombre,
       telefono,
       email,
+      timezone: timezone || 'Europe/Madrid',
       createdAt: new Date().toISOString()
     };
     db.reservas.push(reserva);
@@ -95,7 +121,6 @@ module.exports = {
     await writeDB(db);
     return before !== db.reservas.length;
   },
-  // Exponer lectura/escritura bruta si hace falta
   async raw() {
     return await readDB();
   },
@@ -104,3 +129,5 @@ module.exports = {
     return true;
   }
 };
+
+
