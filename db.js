@@ -72,7 +72,7 @@ module.exports = {
     const db = await readDB();
     return (db.reservas || []).filter(r => r.pistaId === pistaId);
   },
-  async addReserva({ pistaId, startISO, endISO, nombre, telefono, email, date, startTime, durationMin, timezone }) {
+  async addReserva({ pistaId, startISO, endISO, nombre, telefono, email, servicioId, tipoCorte, date, startTime, durationMin, timezone }) {
     const db = await readDB();
     db.reservas = db.reservas || [];
     db.pistas = db.pistas || [];
@@ -99,6 +99,8 @@ module.exports = {
     const reserva = {
       id: makeId('RES_'),
       pistaId,
+      servicioId: servicioId || null,
+      tipoCorte: tipoCorte || null,
       date,
       startTime,
       durationMin,

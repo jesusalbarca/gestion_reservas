@@ -164,11 +164,17 @@ app.post('/api/reservas', async (req, res) => {
 
   try {
 
-    const { pistaId, date, startTime, durationMin, nombre, telefono, email } = req.body;
+    const { pistaId, date, startTime, durationMin, nombre, telefono, email, servicioId, tipoCorte } = req.body;
 
     if (!pistaId || !date || !startTime || !nombre) {
 
       return res.status(400).json({ error: 'Falta campo requerido (pistaId/date/startTime/nombre).' });
+
+    }
+
+    if (!servicioId || typeof servicioId !== 'string' || !servicioId.trim()) {
+
+      return res.status(400).json({ error: 'Falta seleccionar el tipo de servicio.' });
 
     }
 
@@ -223,6 +229,10 @@ app.post('/api/reservas', async (req, res) => {
       telefono,
 
       email,
+
+      servicioId: servicioId.trim(),
+
+      tipoCorte: typeof tipoCorte === 'string' && tipoCorte.trim() ? tipoCorte.trim() : servicioId.trim(),
 
       date,
 
