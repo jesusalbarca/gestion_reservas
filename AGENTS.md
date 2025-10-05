@@ -27,5 +27,6 @@ pm run init-db is required after merging.
 Set PORT, FACILITY_TZ, or other overrides via process env vars in your shell or a .env file (not committed). Remember the JSON-backed store under data/ is single-user; avoid deploying it as-is to multi-user environments, and add locking or move to a real database if concurrent writes become an issue.
 
 ## Dominio funcional
-- El producto gestiona reservas de pistas individuales. Evita copys que hablen de "Pádel Los Nogales" o indiquen un número fijo de pistas disponibles; el contenido genérico debe referirse a la selección de una pista concreta.
-- En la vista de cliente no debe aparecer un acceso visible a la parte de administración. Mantén cada flujo separado hasta que se definan requerimientos adicionales.
+- Por un lado está la app cliente, en index.hmtl. 
+esta app es para que los usuarios puedan seleccionar distintas pistas para revervar. Una vez en la pista seleccionada, podrán elegir una hora y completar sus datos para reservar.
+- Por otro lado, la app admin es para gestionar las pistas y las reservas, pudiendo eliminarlas
