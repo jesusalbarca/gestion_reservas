@@ -37,3 +37,15 @@ esta app es para que los usuarios puedan seleccionar distintas pistas para rever
   - Devuelve `1` cuando `window.matchMedia('(max-width: 600px)')` es verdadero para que, en móviles, los botones avancen o retrocedan día a día manteniendo la continuidad visual.
   - Devuelve `7` en caso contrario para conservar los saltos semanales en viewport amplios.
 - Los controladores `btnPrevDays` y `btnNextDays` actualizan `stripStartDate` y `selectedDate` usando el paso dinámico, claman las fechas con `clampToToday`, y ajustan `selectedDate` al rango visible (`stripStartDate` a `stripStartDate + 6`). Después de mover el rango se invocan `renderDayStrip`, `clearSelectedHour` y `loadCalendar` para refrescar la UI.
+
+## Rama pelu: análisis funcional y técnico
+- **Funcional**
+  - El flujo cliente se adapta a una única peluquería: el selector muestra una sola opción y los textos hablan de citas y servicios de peluquería.
+  - La parrilla de horarios ofrece bloques de 30 minutos desde las 16:00 hasta las 22:00, visibles tanto en el calendario como en el selector de hora de inicio.
+  - El formulario sustituye la duración libre por el campo "Tipo de corte" con tres servicios predefinidos (barba, corte, barba y corte) y valida que se elija uno antes de reservar.
+  - El mensaje de hora seleccionada y las etiquetas del calendario guían al usuario para elegir servicio + horario antes de confirmar la reserva.
+- **Técnico**
+  - Se centraliza la configuración del cliente en `CLIENT_CONFIG`, permitiendo redefinir rango horario, tamaño de bloque y catálogo de servicios mediante `window.__PELUQUERIA_CONFIG__`.
+  - Las funciones auxiliares `buildTimeSlots`, `normalizeServiceConfig` e `isStartTimeAvailableForService` calculan franjas dinámicas y comprueban la disponibilidad continua necesaria para cada servicio (p. ej. 90 minutos = 3 bloques).
+  - `loadCalendar` genera los botones de horario en dos pasos: primero calcula disponibilidad cruda por bloque y luego aplica las restricciones del servicio activo para habilitar/deshabilitar ranuras y filtrar el modo "solo disponibles".
+  - El selector de hora reutiliza `updateStartSelectAvailability` para marcar visualmente ranuras reservadas frente a ranuras insuficientes, manteniendo sincronizado el estado tras cada cambio de servicio o nueva reserva.
