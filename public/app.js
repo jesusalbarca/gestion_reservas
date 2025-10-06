@@ -259,6 +259,8 @@ async function initClient() {
   const resServiceSelect = document.getElementById('resService');
   const selectedHourDisplay = document.getElementById('selectedHourDisplay');
   const formMsg = document.getElementById('formMsg');
+  const reserveSubmitBtn = reserveForm?.querySelector('button[type="submit"]');
+  const reserveSubmitBtnDefaultText = reserveSubmitBtn ? reserveSubmitBtn.textContent : 'Reservar';
 
   const weekdayFormatter = new Intl.DateTimeFormat('es-ES', { weekday: 'short', timeZone: FACILITY_TZ });
   const monthFormatter = new Intl.DateTimeFormat('es-ES', { month: 'short', timeZone: FACILITY_TZ });
@@ -271,6 +273,7 @@ async function initClient() {
   let selectedDate = today;
   let selectedHour = '';
   let latestSlotAvailability = {};
+  let isSubmittingReservation = false;
 
   function getDayNavigationStep() {
     return window.matchMedia('(max-width: 600px)').matches ? 1 : 7;
@@ -420,6 +423,10 @@ async function initClient() {
     formMsg.textContent = '';
     formMsg.style.color = 'crimson';
 
+    if (isSubmittingReservation) {
+      return;
+    }
+
     const pistaId = resPista.value;
     const name = document.getElementById('resName').value.trim();
     const phone = document.getElementById('resPhone').value.trim();
@@ -448,6 +455,11 @@ async function initClient() {
     };
 
     try {
+      isSubmittingReservation = true;
+      if (reserveSubmitBtn) {
+        reserveSubmitBtn.disabled = true;
+        reserveSubmitBtn.textContent = 'Reservando...';
+      }
       const resp = await fetch(API_BASE + '/reservas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -470,15 +482,28 @@ async function initClient() {
         if (Object.keys(latestSlotAvailability).length && resServiceSelect) {
           updateStartSelectAvailability(resStartSelect, latestSlotAvailability, resServiceSelect.value);
         }
-        loadCalendar();
+        await loadCalendar();
         alert('RESERVA CONFIRMADA! REVISA TU CORREO\nReserva confirmada. Revisa tu email de confirmacion.');
       } else {
-        const err = await resp.json();
-        formMsg.textContent = err.error || 'Error creando reserva';
+        const err = await resp.json().catch(() => ({}));
+        if (resp.status === 409) {
+          formMsg.textContent = err?.error || 'La hora seleccionada ya no está disponible.';
+          await loadCalendar();
+          clearSelectedHour();
+        } else {
+          formMsg.textContent = err?.error || 'Error creando reserva';
+        }
       }
     } catch (err) {
       console.error(err);
       formMsg.textContent = 'Error de conexion';
+    }
+    finally {
+      isSubmittingReservation = false;
+      if (reserveSubmitBtn) {
+        reserveSubmitBtn.disabled = false;
+        reserveSubmitBtn.textContent = reserveSubmitBtnDefaultText;
+      }
     }
   });
 
