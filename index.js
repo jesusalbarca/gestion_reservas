@@ -295,6 +295,7 @@ async function sendReservationNotifications(reserva) {
     const serviceLabel = reserva.tipoCorte || reserva.servicioId || 'Reserva';
 
     const baseDetails = `Pista: ${pistaLabel}\nServicio: ${serviceLabel}\nFecha: ${dateLabel}\nHorario: ${startLabel} - ${endLabel}`;
+    const highlightLine = `Tu reserva ha sido confirmada: ${dateLabel} ${startLabel} - ${endLabel}`;
 
     const messages = [];
 
@@ -306,7 +307,7 @@ async function sendReservationNotifications(reserva) {
 
         '',
 
-        'Tu reserva ha sido confirmada:',
+        highlightLine,
 
         baseDetails,
 
@@ -316,13 +317,32 @@ async function sendReservationNotifications(reserva) {
 
       ].join('\n');
 
+      const userHtml = `
+        <div style="font-family: 'Helvetica Neue', Arial, sans-serif; color: #333; line-height: 1.5;">
+          <p style="margin: 0 0 16px;">Hola ${reserva.nombre},</p>
+          <h1 style="margin: 0 0 12px; font-size: 26px; color: #0b5394;">Tu reserva ha sido confirmada</h1>
+          <p style="margin: 0 0 16px; font-size: 18px;">
+            <strong>${dateLabel}</strong>
+            <span style="margin: 0 8px;">·</span>
+            <strong>${startLabel} - ${endLabel}</strong>
+          </p>
+          <p style="margin: 0 0 8px;"><strong>Pista:</strong> ${pistaLabel}</p>
+          <p style="margin: 0 0 8px;"><strong>Servicio:</strong> ${serviceLabel}</p>
+          <p style="margin: 0 0 8px;"><strong>Fecha:</strong> ${dateLabel}</p>
+          <p style="margin: 0 0 16px;"><strong>Horario:</strong> ${startLabel} - ${endLabel}</p>
+          <p style="margin: 0;">Gracias por confiar en nosotros.</p>
+        </div>
+      `;
+
       messages.push({
 
         to: reserva.email.trim(),
 
         subject: `Confirmacion de reserva - ${serviceLabel} (${dateLabel})`,
 
-        text: userText
+        text: userText,
+
+        html: userHtml
 
       });
 
