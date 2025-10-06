@@ -17,6 +17,17 @@
 
   <main>
     <section class="card">
+      <h3>Configuracion de notificaciones</h3>
+      <form id="adminEmailForm">
+        <label>Email administrador:
+          <input id="adminEmail" type="email" placeholder="admin@ejemplo.com" required />
+        </label>
+        <button type="submit">Guardar</button>
+      </form>
+      <div id="adminEmailMsg"></div>
+    </section>
+
+    <section class="card">
       <h3>Crear Pista</h3>
       <form id="pistaForm">
         <label>Nombre: <input id="pistaNombre" required /></label>

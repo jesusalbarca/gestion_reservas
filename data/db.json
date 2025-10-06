@@ -1,5 +1,7 @@
 {
-  "meta": {},
+  "meta": {
+    "adminEmail": ""
+  },
   "pistas": [
     {
       "id": "PISTA_mgdwmufo1x1u5",

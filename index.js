@@ -8,6 +8,7 @@ const cors = require('cors');
 
 const path = require('path');
 
+const nodemailer = require('nodemailer');
 const db = require('./db');
 
 const STATIC_DIR = path.join(__dirname, 'public');
@@ -33,6 +34,29 @@ const MIN_DURATION = 30;
 const MAX_DURATION = 180;
 
 const DURATION_STEP = 15;
+
+const SMTP_HOST = process.env.SMTP_HOST || '';
+const SMTP_PORT = Number(process.env.SMTP_PORT) || 587;
+const SMTP_SECURE = process.env.SMTP_SECURE === 'true';
+const SMTP_USER = process.env.SMTP_USER || '';
+const SMTP_PASS = process.env.SMTP_PASS || '';
+const MAIL_FROM = process.env.MAIL_FROM || (SMTP_USER || 'reservas@example.com');
+
+let mailTransport = null;
+if (SMTP_HOST) {
+  const transportConfig = {
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE
+  };
+  if (SMTP_USER) {
+    transportConfig.auth = {
+      user: SMTP_USER,
+      pass: SMTP_PASS
+    };
+  }
+  mailTransport = nodemailer.createTransport(transportConfig);
+}
 
 function sendAdminAuthChallenge(res, message = 'Autenticacion requerida') {
 
@@ -196,6 +220,178 @@ function getTodayIsoDate(timeZone) {
 
 }
 
+function isValidEmail(email) {
+
+  if (typeof email !== 'string') return false;
+
+  const trimmed = email.trim();
+
+  if (!trimmed) return false;
+
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+
+}
+
+function formatReservationWindow(reserva) {
+
+  const startDate = new Date(reserva.start);
+
+  const endDate = new Date(reserva.end);
+
+  const dateFormatter = new Intl.DateTimeFormat('es-ES', {
+
+    timeZone: FACILITY_TZ,
+
+    year: 'numeric',
+
+    month: '2-digit',
+
+    day: '2-digit'
+
+  });
+
+  const timeFormatter = new Intl.DateTimeFormat('es-ES', {
+
+    timeZone: FACILITY_TZ,
+
+    hour: '2-digit',
+
+    minute: '2-digit'
+
+  });
+
+  return {
+
+    dateLabel: dateFormatter.format(startDate),
+
+    startLabel: timeFormatter.format(startDate),
+
+    endLabel: timeFormatter.format(endDate)
+
+  };
+
+}
+
+function escapeHtml(input) {
+  return String(input)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+async function sendReservationNotifications(reserva) {
+
+  if (!mailTransport) return;
+
+  try {
+
+    const [adminEmail, pistas] = await Promise.all([
+
+      db.getAdminEmail(),
+
+      db.getPistas()
+
+    ]);
+
+    const pista = pistas.find(p => p.id === reserva.pistaId);
+
+    const pistaLabel = pista ? pista.nombre : reserva.pistaId;
+
+    const { dateLabel, startLabel, endLabel } = formatReservationWindow(reserva);
+
+    const serviceLabel = reserva.tipoCorte || reserva.servicioId || 'Reserva';
+
+    const scheduleLabel = `${startLabel} - ${endLabel}`;
+    const baseDetails = `Pista: ${pistaLabel}\nServicio: ${serviceLabel}\nFecha: ${dateLabel}\nHorario: ${scheduleLabel}`;
+    const baseDetailsHtml = [
+      `<li><strong>Pista:</strong> ${escapeHtml(pistaLabel)}</li>`,
+      `<li><strong>Servicio:</strong> ${escapeHtml(serviceLabel)}</li>`,
+      `<li><strong>Fecha:</strong> ${escapeHtml(dateLabel)}</li>`,
+      `<li><strong>Horario:</strong> ${escapeHtml(scheduleLabel)}</li>`
+    ].join('');
+
+    const messages = [];
+
+    if (isValidEmail(reserva.email)) {
+      const userName = reserva.nombre || 'cliente';
+      const userText = [
+        `Hola ${userName},`,
+        '',
+        'Tu reserva ha sido confirmada:',
+        baseDetails,
+        '',
+        'Gracias por confiar en nosotros.'
+      ].join('\n');
+      const userHtml = [
+        `<p style="margin:0 0 16px;">Hola ${escapeHtml(userName)},</p>`,
+        '<h2 style="margin:0 0 16px;font-size:20px;color:#111;">Tu reserva ha sido confirmada:</h2>',
+        `<ul style="margin:0 0 16px;padding-left:20px;">${baseDetailsHtml}</ul>`,
+        '<p style="margin:16px 0 0;">Gracias por confiar en nosotros.</p>'
+      ].join('');
+      messages.push({
+        to: reserva.email.trim(),
+        subject: `Confirmacion de reserva - ${serviceLabel} (${dateLabel})`,
+        text: userText,
+        html: userHtml
+      });
+    }
+
+    if (isValidEmail(adminEmail)) {
+
+      const adminText = [
+
+        'Nueva reserva registrada:',
+
+        baseDetails,
+
+        '',
+
+        `Cliente: ${reserva.nombre}`,
+
+        `Email: ${reserva.email || '-'}`,
+
+        `Telefono: ${reserva.telefono || '-'}`
+
+      ].join('\n');
+
+      messages.push({
+
+        to: adminEmail.trim(),
+
+        subject: `Nueva reserva - ${serviceLabel} (${dateLabel} ${startLabel})`,
+
+        text: adminText
+
+      });
+
+    }
+
+    if (!messages.length) return;
+
+    const sendOps = messages.map(msg => mailTransport.sendMail({
+
+      from: MAIL_FROM,
+
+      ...msg
+
+    }).catch(err => {
+
+      console.error('Error enviando email a', msg.to, err);
+
+    }));
+
+    await Promise.all(sendOps);
+
+  } catch (err) {
+
+    console.error('Error preparando notificaciones de reserva', err);
+
+  }
+
+}
+
 /* ---- RUTAS PUBLICAS (cliente) ---- */
 
 app.get('/api/pistas', async (req, res) => {
@@ -238,19 +434,35 @@ app.post('/api/reservas', async (req, res) => {
 
     const { pistaId, date, startTime, durationMin, nombre, telefono, email, servicioId, tipoCorte } = req.body;
 
-    if (!pistaId || !date || !startTime || !nombre) {
+    const pistaIdValue = typeof pistaId === 'string' ? pistaId.trim() : pistaId;
+
+    const dateValue = typeof date === 'string' ? date.trim() : date;
+
+    const startTimeValue = typeof startTime === 'string' ? startTime.trim() : startTime;
+
+    const nombreValue = typeof nombre === 'string' ? nombre.trim() : nombre;
+
+    const telefonoValue = typeof telefono === 'string' ? telefono.trim() : telefono;
+
+    const emailValue = typeof email === 'string' ? email.trim() : email;
+
+    const servicioIdValue = typeof servicioId === 'string' ? servicioId.trim() : '';
+
+    const tipoCorteValue = typeof tipoCorte === 'string' ? tipoCorte.trim() : '';
+
+    if (!pistaIdValue || !dateValue || !startTimeValue || !nombreValue) {
 
       return res.status(400).json({ error: 'Falta campo requerido (pistaId/date/startTime/nombre).' });
 
     }
 
-    if (!servicioId || typeof servicioId !== 'string' || !servicioId.trim()) {
+    if (!servicioIdValue) {
 
       return res.status(400).json({ error: 'Falta seleccionar el tipo de servicio.' });
 
     }
 
-    if (!isValidDate(date)) {
+    if (!isValidDate(dateValue)) {
 
       return res.status(400).json({ error: 'Formato de fecha invalido (YYYY-MM-DD).' });
 
@@ -258,13 +470,13 @@ app.post('/api/reservas', async (req, res) => {
 
     const todayIso = getTodayIsoDate(FACILITY_TZ);
 
-    if (date < todayIso) {
+    if (dateValue < todayIso) {
 
       return res.status(400).json({ error: 'La fecha debe ser igual o posterior a la fecha actual del centro.' });
 
     }
 
-    if (!isValidTime(startTime)) {
+    if (!isValidTime(startTimeValue)) {
 
       return res.status(400).json({ error: 'Formato de hora invalido (HH:mm).' });
 
@@ -278,7 +490,7 @@ app.post('/api/reservas', async (req, res) => {
 
     }
 
-    const start = zonedDateTimeToUtc(date, startTime, FACILITY_TZ);
+    const start = zonedDateTimeToUtc(dateValue, startTimeValue, FACILITY_TZ);
 
     const end = new Date(start.getTime() + duration * 60000);
 
@@ -290,25 +502,25 @@ app.post('/api/reservas', async (req, res) => {
 
     const reserva = await db.addReserva({
 
-      pistaId,
+      pistaId: pistaIdValue,
 
       startISO: start.toISOString(),
 
       endISO: end.toISOString(),
 
-      nombre,
+      nombre: nombreValue,
 
-      telefono,
+      telefono: telefonoValue,
 
-      email,
+      email: emailValue,
 
-      servicioId: servicioId.trim(),
+      servicioId: servicioIdValue,
 
-      tipoCorte: typeof tipoCorte === 'string' && tipoCorte.trim() ? tipoCorte.trim() : servicioId.trim(),
+      tipoCorte: tipoCorteValue || servicioIdValue,
 
-      date,
+      date: dateValue,
 
-      startTime,
+      startTime: startTimeValue,
 
       durationMin: duration,
 
@@ -317,6 +529,9 @@ app.post('/api/reservas', async (req, res) => {
     });
 
     res.status(201).json(reserva);
+    sendReservationNotifications(reserva).catch(err => {
+      console.error('No se pudieron enviar las notificaciones de reserva', err);
+    });
 
   } catch (err) {
 
@@ -335,6 +550,32 @@ app.post('/api/reservas', async (req, res) => {
 /* ---- RUTAS ADMIN (minimas) ---- */
 
 app.use('/api/admin', requireAdminAuth);
+
+app.get('/api/admin/settings', async (req, res) => {
+
+  const settings = await db.getSettings();
+
+  res.json(settings);
+
+});
+
+app.put('/api/admin/settings', async (req, res) => {
+
+  const { adminEmail } = req.body || {};
+
+  if (adminEmail && !isValidEmail(adminEmail)) {
+
+    return res.status(400).json({ error: 'Email de administrador invalido.' });
+
+  }
+
+  const normalizedEmail = typeof adminEmail === 'string' ? adminEmail.trim() : '';
+
+  const settings = await db.setAdminEmail(normalizedEmail);
+
+  res.json(settings);
+
+});
 
 app.get('/api/admin/reservas', async (req, res) => {
 
@@ -396,11 +637,37 @@ app.get('*', (req, res) => {
 
 });
 
-app.listen(PORT, () => {
+function startServer(port = PORT) {
 
-  console.log(`Servidor arrancado en http://localhost:${PORT}`);
+  const server = app.listen(port, () => {
 
-  console.log('Cliente disponible en: http://localhost:' + PORT + '/index.html');
+    if (NODE_ENV === 'test') return;
 
-});
+    const address = server.address();
+
+    const actualPort = typeof address === 'object' && address ? address.port : port;
+
+    console.log(`Servidor arrancado en http://localhost:${actualPort}`);
+
+    console.log('Cliente disponible en: http://localhost:' + actualPort + '/index.html');
+
+  });
+
+  return server;
+
+}
+
+if (require.main === module) {
+
+  startServer();
+
+}
+
+module.exports = {
+
+  app,
+
+  startServer
+
+};
 
