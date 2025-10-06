@@ -1,5 +1,7 @@
 // index.js
 
+require('dotenv').config();
+
 const express = require('express');
 
 const cors = require('cors');
@@ -7,6 +9,20 @@ const cors = require('cors');
 const path = require('path');
 
 const db = require('./db');
+
+const STATIC_DIR = path.join(__dirname, 'public');
+
+const ADMIN_USER = process.env.ADMIN_USER || '';
+
+const ADMIN_PASS = process.env.ADMIN_PASS || '';
+
+const ADMIN_AUTH_REALM = process.env.ADMIN_AUTH_REALM || 'Reservas Admin';
+
+const FORCE_ADMIN_AUTH = process.env.FORCE_ADMIN_AUTH === 'true';
+
+const NODE_ENV = process.env.NODE_ENV || 'development';
+
+const ADMIN_AUTH_ENABLED = Boolean(ADMIN_USER && ADMIN_PASS && (NODE_ENV === 'production' || FORCE_ADMIN_AUTH));
 
 const PORT = process.env.PORT || 3000;
 
@@ -18,13 +34,69 @@ const MAX_DURATION = 180;
 
 const DURATION_STEP = 15;
 
+function sendAdminAuthChallenge(res, message = 'Autenticacion requerida') {
+
+  res.set('WWW-Authenticate', `Basic realm="${ADMIN_AUTH_REALM}", charset="UTF-8"`);
+
+  return res.status(401).send(message);
+
+}
+
+function requireAdminAuth(req, res, next) {
+
+  if (!ADMIN_AUTH_ENABLED) return next();
+
+  const authHeader = req.headers.authorization || '';
+
+  const [scheme, encoded] = authHeader.split(' ');
+
+  if (scheme !== 'Basic' || !encoded) {
+
+    return sendAdminAuthChallenge(res);
+
+  }
+
+  let decoded = '';
+
+  try {
+
+    decoded = Buffer.from(encoded, 'base64').toString('utf8');
+
+  } catch (err) {
+
+    return sendAdminAuthChallenge(res);
+
+  }
+
+  const separatorIndex = decoded.indexOf(':');
+
+  const username = separatorIndex >= 0 ? decoded.slice(0, separatorIndex) : decoded;
+
+  const password = separatorIndex >= 0 ? decoded.slice(separatorIndex + 1) : '';
+
+  if (username !== ADMIN_USER || password !== ADMIN_PASS) {
+
+    return sendAdminAuthChallenge(res, 'Credenciales invalidas');
+
+  }
+
+  return next();
+
+}
+
 const app = express();
 
 app.use(cors());
 
 app.use(express.json());
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.get('/admin.html', requireAdminAuth, (req, res) => {
+
+  res.sendFile(path.join(STATIC_DIR, 'admin.html'));
+
+});
+
+app.use(express.static(STATIC_DIR));
 
 function getTimeZoneOffsetMinutes(date, timeZone) {
 
@@ -164,11 +236,17 @@ app.post('/api/reservas', async (req, res) => {
 
   try {
 
-    const { pistaId, date, startTime, durationMin, nombre, telefono, email } = req.body;
+    const { pistaId, date, startTime, durationMin, nombre, telefono, email, servicioId, tipoCorte } = req.body;
 
     if (!pistaId || !date || !startTime || !nombre) {
 
       return res.status(400).json({ error: 'Falta campo requerido (pistaId/date/startTime/nombre).' });
+
+    }
+
+    if (!servicioId || typeof servicioId !== 'string' || !servicioId.trim()) {
+
+      return res.status(400).json({ error: 'Falta seleccionar el tipo de servicio.' });
 
     }
 
@@ -224,6 +302,10 @@ app.post('/api/reservas', async (req, res) => {
 
       email,
 
+      servicioId: servicioId.trim(),
+
+      tipoCorte: typeof tipoCorte === 'string' && tipoCorte.trim() ? tipoCorte.trim() : servicioId.trim(),
+
       date,
 
       startTime,
@@ -251,6 +333,8 @@ app.post('/api/reservas', async (req, res) => {
 });
 
 /* ---- RUTAS ADMIN (minimas) ---- */
+
+app.use('/api/admin', requireAdminAuth);
 
 app.get('/api/admin/reservas', async (req, res) => {
 
@@ -302,7 +386,7 @@ app.delete('/api/admin/reservas/:id', async (req, res) => {
 
 app.get('/api/status', (req, res) => {
 
-  res.json({ ok: true, env: process.env.NODE_ENV || 'dev', timezone: FACILITY_TZ });
+  res.json({ ok: true, env: NODE_ENV || 'dev', timezone: FACILITY_TZ });
 
 });
 

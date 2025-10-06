@@ -383,6 +383,13 @@ button {
   cursor: not-allowed;
 }
 
+.slot-btn.is-unavailable {
+  background: rgba(148, 163, 184, 0.25);
+  color: #64748b;
+  cursor: not-allowed;
+  border: 1px dashed rgba(148, 163, 184, 0.6);
+}
+
 .selected-hour {
   margin: 16px 0;
   padding: 12px 16px;
@@ -407,6 +414,12 @@ select option:disabled,
 select option.is-reserved {
   color: #94a3b8;
   background-color: #e2e8f0;
+}
+
+select option.is-unavailable {
+  color: #94a3b8;
+  background-color: #f8fafc;
+  font-style: italic;
 }
 
 .primary-btn {

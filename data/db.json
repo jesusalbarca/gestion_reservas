@@ -1,0 +1,46 @@
+{
+  "meta": {},
+  "pistas": [
+    {
+      "id": "PISTA_mgdwmufo1x1u5",
+      "nombre": "susoBarber",
+      "descripcion": "best peluqueria",
+      "createdAt": "2025-10-05T16:16:41.364Z"
+    }
+  ],
+  "usuarios": [],
+  "reservas": [
+    {
+      "id": "RES_mgdwqd2hgozes",
+      "pistaId": "PISTA_mgdwmufo1x1u5",
+      "servicioId": "barba-corte",
+      "tipoCorte": "Barba y corte",
+      "date": "2025-10-05",
+      "startTime": "16:00",
+      "durationMin": 90,
+      "start": "2025-10-05T16:00:00.000Z",
+      "end": "2025-10-05T17:30:00.000Z",
+      "nombre": "Juan",
+      "telefono": "737373",
+      "email": "jesusjesus1999@gmail.com",
+      "timezone": "Europe/Madrid",
+      "createdAt": "2025-10-05T16:19:25.481Z"
+    },
+    {
+      "id": "RES_mge1bn0nzhxf4",
+      "pistaId": "PISTA_mgdwmufo1x1u5",
+      "servicioId": "barba",
+      "tipoCorte": "Barba",
+      "date": "2025-10-05",
+      "startTime": "19:30",
+      "durationMin": 30,
+      "start": "2025-10-05T19:30:00.000Z",
+      "end": "2025-10-05T20:00:00.000Z",
+      "nombre": "fda",
+      "telefono": "654654",
+      "email": "dfa@fa.es",
+      "timezone": "Europe/Madrid",
+      "createdAt": "2025-10-05T18:27:56.615Z"
+    }
+  ]
+}
