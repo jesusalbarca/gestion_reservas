@@ -12,7 +12,8 @@ const now = new Date().toISOString();
 const sample = {
   meta: {
     timezone: 'Europe/Madrid',
-    createdAt: now
+    createdAt: now,
+    adminEmail: 'admin@demo.local'
   },
   pistas: [
     { id: 'PISTA_01', nombre: 'Pista Futbol Sala', descripcion: 'Pabellon principal', createdAt: now },

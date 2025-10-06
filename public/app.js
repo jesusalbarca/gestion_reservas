@@ -471,6 +471,7 @@ async function initClient() {
           updateStartSelectAvailability(resStartSelect, latestSlotAvailability, resServiceSelect.value);
         }
         loadCalendar();
+        alert('RESERVA CONFIRMADA! REVISA TU CORREO');
       } else {
         const err = await resp.json();
         formMsg.textContent = err.error || 'Error creando reserva';
@@ -674,10 +675,41 @@ function updateStartSelectAvailability(selectEl, slotAvailability, serviceId) {
 
 /* ----------------- ADMIN ----------------- */
 async function initAdmin() {
+  const adminEmailForm = document.getElementById('adminEmailForm');
+  const adminEmailInput = document.getElementById('adminEmail');
+  const adminEmailMsg = document.getElementById('adminEmailMsg');
   const pistasForm = document.getElementById('pistaForm');
   const pistaMsg = document.getElementById('pistaMsg');
   const pistasList = document.getElementById('pistasList');
   const reservasList = document.getElementById('reservasList');
+
+  adminEmailForm.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    adminEmailMsg.textContent = '';
+    adminEmailMsg.style.color = 'crimson';
+    const email = adminEmailInput.value.trim();
+    if (!email) {
+      adminEmailMsg.textContent = 'Introduce un email valido';
+      return;
+    }
+    try {
+      const resp = await fetch(API_BASE + '/admin/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminEmail: email })
+      });
+      if (resp.ok) {
+        adminEmailMsg.style.color = 'green';
+        adminEmailMsg.textContent = 'Email de administrador actualizado';
+        adminEmailInput.value = email;
+      } else {
+        const err = await resp.json().catch(() => ({}));
+        adminEmailMsg.textContent = err.error || 'No se pudo guardar el email';
+      }
+    } catch (err) {
+      adminEmailMsg.textContent = 'Error de conexion';
+    }
+  });
 
   pistasForm.addEventListener('submit', async (ev) => {
     ev.preventDefault();
@@ -710,6 +742,20 @@ async function initAdmin() {
       pistaMsg.textContent = 'Error de conexion';
     }
   });
+
+  async function loadSettings() {
+    adminEmailMsg.textContent = '';
+    adminEmailMsg.style.color = '';
+    try {
+      const settings = await fetch(API_BASE + '/admin/settings').then(r => r.json());
+      if (settings && typeof settings.adminEmail === 'string') {
+        adminEmailInput.value = settings.adminEmail;
+      }
+    } catch (err) {
+      adminEmailMsg.style.color = 'crimson';
+      adminEmailMsg.textContent = 'No se pudo cargar el email del administrador';
+    }
+  }
 
   async function loadPistas() {
     pistasList.textContent = 'Cargando...';
@@ -777,6 +823,7 @@ async function initAdmin() {
     });
   }
 
+  await loadSettings();
   loadPistas();
   loadReservas();
 }
