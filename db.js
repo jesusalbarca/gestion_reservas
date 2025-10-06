@@ -123,6 +123,26 @@ module.exports = {
     await writeDB(db);
     return before !== db.reservas.length;
   },
+  async getSettings() {
+    const db = await readDB();
+    const meta = db.meta || {};
+    return {
+      adminEmail: typeof meta.adminEmail === 'string' ? meta.adminEmail : ''
+    };
+  },
+  async getAdminEmail() {
+    const settings = await this.getSettings();
+    return settings.adminEmail;
+  },
+  async setAdminEmail(adminEmail) {
+    const db = await readDB();
+    db.meta = db.meta || {};
+    db.meta.adminEmail = typeof adminEmail === 'string' ? adminEmail.trim() : '';
+    await writeDB(db);
+    return {
+      adminEmail: db.meta.adminEmail
+    };
+  },
   async raw() {
     return await readDB();
   },
