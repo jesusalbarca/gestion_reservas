@@ -38,14 +38,33 @@ esta app es para que los usuarios puedan seleccionar distintas pistas para rever
   - Devuelve `7` en caso contrario para conservar los saltos semanales en viewport amplios.
 - Los controladores `btnPrevDays` y `btnNextDays` actualizan `stripStartDate` y `selectedDate` usando el paso dinámico, claman las fechas con `clampToToday`, y ajustan `selectedDate` al rango visible (`stripStartDate` a `stripStartDate + 6`). Después de mover el rango se invocan `renderDayStrip`, `clearSelectedHour` y `loadCalendar` para refrescar la UI.
 
-## Rama pelu: análisis funcional y técnico
-- **Funcional**
-  - El flujo cliente se adapta a una única peluquería: el selector muestra una sola opción y los textos hablan de citas y servicios de peluquería.
-  - La parrilla de horarios ofrece bloques de 30 minutos desde las 16:00 hasta las 22:00, visibles tanto en el calendario como en el selector de hora de inicio.
-  - El formulario sustituye la duración libre por el campo "Tipo de corte" con tres servicios predefinidos (barba, corte, barba y corte) y valida que se elija uno antes de reservar.
-  - El mensaje de hora seleccionada y las etiquetas del calendario guían al usuario para elegir servicio + horario antes de confirmar la reserva.
-- **Técnico**
-  - Se centraliza la configuración del cliente en `CLIENT_CONFIG`, permitiendo redefinir rango horario, tamaño de bloque y catálogo de servicios mediante `window.__PELUQUERIA_CONFIG__`.
-  - Las funciones auxiliares `buildTimeSlots`, `normalizeServiceConfig` e `isStartTimeAvailableForService` calculan franjas dinámicas y comprueban la disponibilidad continua necesaria para cada servicio (p. ej. 90 minutos = 3 bloques).
-  - `loadCalendar` genera los botones de horario en dos pasos: primero calcula disponibilidad cruda por bloque y luego aplica las restricciones del servicio activo para habilitar/deshabilitar ranuras y filtrar el modo "solo disponibles".
-  - El selector de hora reutiliza `updateStartSelectAvailability` para marcar visualmente ranuras reservadas frente a ranuras insuficientes, manteniendo sincronizado el estado tras cada cambio de servicio o nueva reserva.
+## Análisis técnico del código
+
+### Arquitectura general
+El proyecto combina un servidor Express minimalista con un cliente estático en vanilla JS. El servidor habilita CORS, parsea JSON y publica la carpeta `public/`, mientras reutiliza constantes compartidas para controlar la duración y zona horaria de las reservas.
+
+### Backend Express
+`index.js` centraliza los endpoints REST. Expone rutas públicas para listar pistas y reservas con filtros opcionales, valida los payloads de creación (formato de fecha/hora, duración dentro de los límites y no-reserva en el pasado), transforma las horas locales a UTC y propaga códigos de error semánticos (`CONFLICT`, `INVALID_PISTA`). También ofrece un subconjunto de rutas administrativas para CRUD básico de pistas y borrado de reservas, además de un health-check y un manejador catch-all 404.
+
+El archivo define utilidades puras para calcular offsets horarios y convertir combinaciones fecha/hora a UTC, lógica que se alinea con la del cliente para mantener consistencia de zona horaria.
+
+### Acceso a datos y modelo persistente
+`db.js` encapsula el acceso a un JSON local (`data/db.json`). Implementa `readDB`/`writeDB` asíncronos, un generador de IDs prefijados y operaciones CRUD para pistas, usuarios y reservas. `addReserva` valida la existencia de la pista, comprueba solapamientos antes de guardar y persiste los campos normalizados (`start`, `end`, `date`, `startTime`, `durationMin`, contacto y `timezone`). `deletePista` cascada las reservas asociadas. Existen métodos `raw`/`saveRaw` para trabajar con la estructura completa cuando sea necesario.
+
+El script `db_init.js` crea la carpeta de datos, genera un dataset de ejemplo con metadatos de zona horaria, pistas demo, un usuario y un array vacío de reservas, útil para reseeding manual.
+
+### Cliente web (JavaScript)
+`public/app.js` detecta la página actual y activa `initClient` o `initAdmin`. Comparte utilidades de zona horaria con el backend para formateos y cálculos. `initClient` monta toda la interacción del flujo de reservas: inicializa selectores y formateadores, controla un carrusel de 7 días con paso adaptable (1 día en pantallas estrechas, 7 en anchas), sincroniza un `input` de fecha mínimo en “hoy”, pinta disponibilidad por hora solicitando `/api/reservas`, distingue slots reservados vs. disponibles y mantiene estado de la hora seleccionada. El envío del formulario construye el payload alineado con lo que espera la API y refresca la vista tras reservar.
+
+`updateStartSelectAvailability` sincroniza la lista desplegable de horas con los botones del calendario. `initAdmin` alimenta la vista administrativa: formulario de creación de pistas, listados renderizados dinámicamente con botones para borrar pistas (con confirmación) y reservas, actualizados a través de las rutas `/api/admin`.
+
+### Vistas HTML estáticas
+`public/index.html` arma la landing del cliente con cabecera hero, controles para pista/fecha, tira de días navegable, toggle de “solo disponibles” y formulario de reserva con campos ocultos sincronizados por JavaScript. Se carga `app.js` al final para enlazar la lógica dinámica.
+
+`public/admin.html` provee una versión administrativa sencilla con formularios y listados en contenedores tipo tarjeta, reutilizando los estilos y el script compartido.
+
+### Dependencias y scripts
+El `package.json` declara únicamente `express` y `cors`, con scripts de arranque (`node index.js`) y resiembra (`node db_init.js`), reflejando la ausencia de herramientas de build o testing automatizado en el estado actual del prototipo.
+
+### Testing
+⚠️ No se ejecutaron pruebas (revisión estática)
