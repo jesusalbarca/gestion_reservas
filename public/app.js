@@ -471,7 +471,7 @@ async function initClient() {
           updateStartSelectAvailability(resStartSelect, latestSlotAvailability, resServiceSelect.value);
         }
         loadCalendar();
-        alert('Reserva confirmada. Revisa tu email de confirmacion.');
+        alert('RESERVA CONFIRMADA! REVISA TU CORREO\nReserva confirmada. Revisa tu email de confirmacion.');
       } else {
         const err = await resp.json();
         formMsg.textContent = err.error || 'Error creando reserva';
