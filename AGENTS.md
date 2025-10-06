@@ -67,3 +67,7 @@ El `package.json` incluye `express`, `cors`, `dotenv` y `nodemailer`. Los script
 
 ### Testing
 ✅ La suite `npm test` verifica la edición del email admin y la creación de reservas end-to-end contra la API real. Extiende esta cobertura cuando añadas nuevas reglas críticas.
+
+## Concurrencia en reservas (2024-05)
+- Las operaciones de alta de reservas están serializadas mediante `withReservaWriteLock` dentro de `db.js`. Cuando modifiques la persistencia, mantén esta sección o reemplázala por un mecanismo equivalente (mutex/bloqueo transaccional) para evitar solapamientos cuando llegan dos peticiones simultáneas.
+- El cliente (`public/app.js`) deshabilita el botón "Reservar" durante el envío y, si el backend devuelve `409 CONFLICT`, fuerza un `loadCalendar()` para refrescar disponibilidad y limpiar la selección actual. Si añades nuevos flujos de reserva, replica esta UX para prevenir que los usuarios trabajen sobre slots obsoletos.
