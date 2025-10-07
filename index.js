@@ -26,6 +26,7 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 const ADMIN_AUTH_ENABLED = Boolean(ADMIN_USER && ADMIN_PASS && (NODE_ENV === 'production' || FORCE_ADMIN_AUTH));
 
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
 
 const FACILITY_TZ = 'Europe/Madrid';
 
@@ -749,9 +750,9 @@ app.get('*', (req, res) => {
 
 });
 
-function startServer(port = PORT) {
+function startServer(port = PORT, host = HOST) {
 
-  const server = app.listen(port, () => {
+  const server = app.listen(port, host, () => {
 
     if (NODE_ENV === 'test') return;
 
@@ -759,9 +760,17 @@ function startServer(port = PORT) {
 
     const actualPort = typeof address === 'object' && address ? address.port : port;
 
-    console.log(`Servidor arrancado en http://localhost:${actualPort}`);
+    const actualHost = typeof address === 'object' && address && address.address
 
-    console.log('Cliente disponible en: http://localhost:' + actualPort + '/index.html');
+      ? address.address
+
+      : host;
+
+    const publicHost = actualHost === '::' ? 'localhost' : actualHost;
+
+    console.log(`Servidor arrancado en http://${publicHost}:${actualPort}`);
+
+    console.log('Cliente disponible en: http://' + publicHost + ':' + actualPort + '/index.html');
 
   });
 
