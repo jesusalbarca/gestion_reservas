@@ -771,7 +771,26 @@ function startServer(port = PORT) {
 
 if (require.main === module) {
 
-  startServer();
+  const server = startServer();
+
+  let shuttingDown = false;
+
+  function gracefulShutdown(signal) {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    if (NODE_ENV !== 'test') {
+      console.log(`Recibida señal ${signal}, cerrando servidor...`);
+    }
+    server.close(() => {
+      process.exit(0);
+    });
+    setTimeout(() => {
+      process.exit(0);
+    }, 5000).unref();
+  }
+
+  process.once('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.once('SIGINT', () => gracefulShutdown('SIGINT'));
 
 }
 
