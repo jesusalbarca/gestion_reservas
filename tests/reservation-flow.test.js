@@ -77,3 +77,81 @@ test('reserva API persiste email admin y crea reservas', async (t) => {
   assert.ok(Array.isArray(reservasBody));
   assert.ok(reservasBody.some(r => r.id === reservaBody.id));
 });
+
+test('admin puede eliminar reservas pasadas', async (t) => {
+  const originalDb = cloneDeep(await db.raw());
+  const workingDb = cloneDeep(originalDb);
+  workingDb.pistas = workingDb.pistas || [];
+
+  let pistaId;
+  if (workingDb.pistas.length === 0) {
+    pistaId = 'PISTA_TEST_PAST';
+    workingDb.pistas.push({
+      id: pistaId,
+      nombre: 'Pista Temporal',
+      descripcion: 'Creada para pruebas',
+      createdAt: new Date().toISOString()
+    });
+  } else {
+    pistaId = workingDb.pistas[0].id;
+  }
+
+  const pastReserva = {
+    id: 'RES_TEST_PAST',
+    pistaId,
+    servicioId: 'test-service',
+    tipoCorte: 'test-service',
+    date: '2000-01-01',
+    startTime: '10:00',
+    durationMin: 60,
+    start: new Date('2000-01-01T09:00:00.000Z').toISOString(),
+    end: new Date('2000-01-01T10:00:00.000Z').toISOString(),
+    nombre: 'Reserva Pasada',
+    telefono: '600000001',
+    email: 'past@example.com',
+    timezone: 'Europe/Madrid',
+    createdAt: new Date('2000-01-01T08:00:00.000Z').toISOString()
+  };
+
+  const futureReserva = {
+    id: 'RES_TEST_FUTURE',
+    pistaId,
+    servicioId: 'test-service',
+    tipoCorte: 'test-service',
+    date: '2999-01-01',
+    startTime: '10:00',
+    durationMin: 60,
+    start: new Date('2999-01-01T09:00:00.000Z').toISOString(),
+    end: new Date('2999-01-01T10:00:00.000Z').toISOString(),
+    nombre: 'Reserva Futura',
+    telefono: '600000002',
+    email: 'future@example.com',
+    timezone: 'Europe/Madrid',
+    createdAt: new Date().toISOString()
+  };
+
+  workingDb.reservas = (workingDb.reservas || []).filter(r => r.id !== pastReserva.id && r.id !== futureReserva.id);
+  workingDb.reservas.push(pastReserva, futureReserva);
+  await db.saveRaw(workingDb);
+
+  const server = startServer(0);
+  await once(server, 'listening');
+  const address = server.address();
+  const port = typeof address === 'object' && address ? address.port : 0;
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  t.after(async () => {
+    await new Promise(resolve => server.close(resolve));
+    await db.saveRaw(originalDb);
+  });
+
+  const deleteRes = await fetch(`${baseUrl}/api/admin/reservas/pasadas`, { method: 'DELETE' });
+  assert.strictEqual(deleteRes.status, 200);
+  const deleteBody = await deleteRes.json();
+  assert.ok(deleteBody);
+  assert.strictEqual(deleteBody.removed >= 1, true);
+
+  const reservasRestantes = await db.getReservas();
+  assert.ok(!reservasRestantes.some(r => r.id === pastReserva.id));
+  assert.ok(reservasRestantes.some(r => r.id === futureReserva.id));
+});
