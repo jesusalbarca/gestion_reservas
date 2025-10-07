@@ -43,19 +43,54 @@ const SMTP_PASS = process.env.SMTP_PASS || '';
 const MAIL_FROM = process.env.MAIL_FROM || (SMTP_USER || 'reservas@example.com');
 
 let mailTransport = null;
-if (SMTP_HOST) {
+let mailTransportInitPromise = null;
+
+function resetMailTransport() {
+  mailTransport = null;
+  mailTransportInitPromise = null;
+}
+
+async function buildMailTransport() {
+  if (!SMTP_HOST) return null;
   const transportConfig = {
     host: SMTP_HOST,
     port: SMTP_PORT,
     secure: SMTP_SECURE
   };
   if (SMTP_USER) {
+    let password = SMTP_PASS;
+    if (!password) {
+      try {
+        const settings = await db.getSettings();
+        if (settings && typeof settings.smtpPass === 'string' && settings.smtpPass) {
+          password = settings.smtpPass;
+        }
+      } catch (err) {
+        console.error('No se pudo cargar SMTP_PASS desde settings', err);
+      }
+    }
     transportConfig.auth = {
       user: SMTP_USER,
-      pass: SMTP_PASS
+      pass: password || ''
     };
   }
-  mailTransport = nodemailer.createTransport(transportConfig);
+  return nodemailer.createTransport(transportConfig);
+}
+
+async function getMailTransport() {
+  if (!SMTP_HOST) return null;
+  if (mailTransport) return mailTransport;
+  if (!mailTransportInitPromise) {
+    mailTransportInitPromise = buildMailTransport().catch(err => {
+      console.error('No se pudo inicializar el transporte SMTP', err);
+      return null;
+    });
+  }
+  mailTransport = await mailTransportInitPromise;
+  if (!mailTransport) {
+    mailTransportInitPromise = null;
+  }
+  return mailTransport;
 }
 
 function sendAdminAuthChallenge(res, message = 'Autenticacion requerida') {
@@ -274,7 +309,9 @@ function formatReservationWindow(reserva) {
 
 async function sendReservationNotifications(reserva) {
 
-  if (!mailTransport) return;
+  const transport = await getMailTransport();
+
+  if (!transport) return;
 
   try {
 
@@ -380,7 +417,7 @@ async function sendReservationNotifications(reserva) {
 
     if (!messages.length) return;
 
-    const sendOps = messages.map(msg => mailTransport.sendMail({
+    const sendOps = messages.map(msg => transport.sendMail({
 
       from: MAIL_FROM,
 
@@ -571,17 +608,33 @@ app.get('/api/admin/settings', async (req, res) => {
 
 app.put('/api/admin/settings', async (req, res) => {
 
-  const { adminEmail } = req.body || {};
+  const body = req.body || {};
+  const hasAdminEmail = Object.prototype.hasOwnProperty.call(body, 'adminEmail');
+  const hasSmtpPass = Object.prototype.hasOwnProperty.call(body, 'smtpPass');
 
-  if (adminEmail && !isValidEmail(adminEmail)) {
-
-    return res.status(400).json({ error: 'Email de administrador invalido.' });
-
+  if (!hasAdminEmail && !hasSmtpPass) {
+    return res.status(400).json({ error: 'No se proporcionaron ajustes para actualizar.' });
   }
 
-  const normalizedEmail = typeof adminEmail === 'string' ? adminEmail.trim() : '';
+  const payload = {};
 
-  const settings = await db.setAdminEmail(normalizedEmail);
+  if (hasAdminEmail) {
+    const normalizedEmail = typeof body.adminEmail === 'string' ? body.adminEmail.trim() : '';
+    if (normalizedEmail && !isValidEmail(normalizedEmail)) {
+      return res.status(400).json({ error: 'Email de administrador invalido.' });
+    }
+    payload.adminEmail = normalizedEmail;
+  }
+
+  if (hasSmtpPass) {
+    payload.smtpPass = typeof body.smtpPass === 'string' ? body.smtpPass : '';
+  }
+
+  const settings = await db.setSettings(payload);
+
+  if (hasSmtpPass) {
+    resetMailTransport();
+  }
 
   res.json(settings);
 

@@ -29,16 +29,26 @@ test('reserva API persiste email admin y crea reservas', async (t) => {
   const settingsBody = await settingsRes.json();
   assert.ok(settingsBody);
   assert.ok(Object.prototype.hasOwnProperty.call(settingsBody, 'adminEmail'));
+  assert.ok(Object.prototype.hasOwnProperty.call(settingsBody, 'smtpPass'));
+  assert.strictEqual(settingsBody.smtpPass, '');
 
   const testAdminEmail = 'admin+test@example.com';
+  const testSmtpPass = 'smtp-test-secret';
   const updateRes = await fetch(`${baseUrl}/api/admin/settings`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ adminEmail: testAdminEmail })
+    body: JSON.stringify({
+      adminEmail: testAdminEmail,
+      smtpPass: testSmtpPass
+    })
   });
   assert.strictEqual(updateRes.status, 200);
   const updateBody = await updateRes.json();
   assert.strictEqual(updateBody.adminEmail, testAdminEmail);
+  assert.strictEqual(updateBody.smtpPass, testSmtpPass);
+
+  const persistedSettings = await db.getSettings();
+  assert.strictEqual(persistedSettings.smtpPass, testSmtpPass);
 
   let pistaId;
   const pistas = await db.getPistas();

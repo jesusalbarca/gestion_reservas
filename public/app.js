@@ -703,6 +703,7 @@ async function initAdmin() {
   const adminEmailForm = document.getElementById('adminEmailForm');
   const adminEmailInput = document.getElementById('adminEmail');
   const adminEmailMsg = document.getElementById('adminEmailMsg');
+  const smtpPassInput = document.getElementById('smtpPass');
   const pistasForm = document.getElementById('pistaForm');
   const pistaMsg = document.getElementById('pistaMsg');
   const pistasList = document.getElementById('pistasList');
@@ -723,15 +724,20 @@ async function initAdmin() {
       const resp = await fetch(API_BASE + '/admin/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminEmail: email })
+        body: JSON.stringify({
+          adminEmail: email,
+          smtpPass: smtpPassInput ? smtpPassInput.value : ''
+        })
       });
       if (resp.ok) {
         adminEmailMsg.style.color = 'green';
-        adminEmailMsg.textContent = 'Email de administrador actualizado';
-        adminEmailInput.value = email;
+        adminEmailMsg.textContent = 'Ajustes de notificaciones actualizados';
+        const payload = await resp.json();
+        adminEmailInput.value = payload.adminEmail || '';
+        if (smtpPassInput) smtpPassInput.value = payload.smtpPass || '';
       } else {
         const err = await resp.json().catch(() => ({}));
-        adminEmailMsg.textContent = err.error || 'No se pudo guardar el email';
+        adminEmailMsg.textContent = err.error || 'No se pudieron guardar los ajustes';
       }
     } catch (err) {
       adminEmailMsg.textContent = 'Error de conexion';
@@ -778,9 +784,12 @@ async function initAdmin() {
       if (settings && typeof settings.adminEmail === 'string') {
         adminEmailInput.value = settings.adminEmail;
       }
+      if (smtpPassInput && settings && typeof settings.smtpPass === 'string') {
+        smtpPassInput.value = settings.smtpPass;
+      }
     } catch (err) {
       adminEmailMsg.style.color = 'crimson';
-      adminEmailMsg.textContent = 'No se pudo cargar el email del administrador';
+      adminEmailMsg.textContent = 'No se pudieron cargar los ajustes de notificacion';
     }
   }
 
