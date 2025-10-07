@@ -133,6 +133,42 @@ module.exports = {
     await writeDB(db);
     return before !== db.reservas.length;
   },
+  async deleteReservasBeforeDate(dateIso, timeZone = 'UTC') {
+    if (!dateIso) {
+      return { removed: 0 };
+    }
+    return withReservaWriteLock(async () => {
+      const db = await readDB();
+      const reservas = db.reservas || [];
+      if (reservas.length === 0) {
+        return { removed: 0 };
+      }
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      const keep = [];
+      let removed = 0;
+      for (const reserva of reservas) {
+        let reservaDate = typeof reserva.date === 'string' ? reserva.date : '';
+        if (!reservaDate && reserva && reserva.start) {
+          reservaDate = formatter.format(new Date(reserva.start));
+        }
+        if (reservaDate && reservaDate < dateIso) {
+          removed += 1;
+        } else {
+          keep.push(reserva);
+        }
+      }
+      if (removed > 0) {
+        db.reservas = keep;
+        await writeDB(db);
+      }
+      return { removed };
+    });
+  },
   async getSettings() {
     const db = await readDB();
     const meta = db.meta || {};

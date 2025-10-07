@@ -595,6 +595,16 @@ app.get('/api/admin/reservas', async (req, res) => {
 
 });
 
+app.delete('/api/admin/reservas/pasadas', async (req, res) => {
+
+  const todayIso = getTodayIsoDate(FACILITY_TZ);
+
+  const result = await db.deleteReservasBeforeDate(todayIso, FACILITY_TZ);
+
+  res.json(result);
+
+});
+
 app.get('/api/admin/pistas', async (req, res) => {
 
   const pistas = await db.getPistas();

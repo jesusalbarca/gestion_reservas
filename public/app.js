@@ -707,6 +707,8 @@ async function initAdmin() {
   const pistaMsg = document.getElementById('pistaMsg');
   const pistasList = document.getElementById('pistasList');
   const reservasList = document.getElementById('reservasList');
+  const deletePastReservasBtn = document.getElementById('deletePastReservasBtn');
+  const deletePastReservasMsg = document.getElementById('deletePastReservasMsg');
 
   adminEmailForm.addEventListener('submit', async (ev) => {
     ev.preventDefault();
@@ -845,6 +847,37 @@ async function initAdmin() {
           alert('No se pudo eliminar');
         }
       });
+    });
+  }
+
+  if (deletePastReservasBtn && deletePastReservasMsg) {
+    deletePastReservasBtn.addEventListener('click', async () => {
+      deletePastReservasMsg.textContent = '';
+      deletePastReservasMsg.style.color = '';
+      if (!confirm('Eliminar todas las reservas anteriores a hoy?')) return;
+      deletePastReservasBtn.disabled = true;
+      deletePastReservasMsg.textContent = 'Eliminando...';
+      try {
+        const resp = await fetch(API_BASE + '/admin/reservas/pasadas', { method: 'DELETE' });
+        if (resp.ok) {
+          const data = await resp.json().catch(() => ({}));
+          const removed = Number(data.removed) || 0;
+          deletePastReservasMsg.style.color = 'green';
+          deletePastReservasMsg.textContent = removed
+            ? `Se eliminaron ${removed} reservas pasadas.`
+            : 'No habia reservas pasadas.';
+          loadReservas();
+        } else {
+          const err = await resp.json().catch(() => ({}));
+          deletePastReservasMsg.style.color = 'crimson';
+          deletePastReservasMsg.textContent = err.error || 'No se pudieron eliminar las reservas pasadas';
+        }
+      } catch (err) {
+        deletePastReservasMsg.style.color = 'crimson';
+        deletePastReservasMsg.textContent = 'Error de conexion';
+      } finally {
+        deletePastReservasBtn.disabled = false;
+      }
     });
   }
 
