@@ -427,6 +427,11 @@ async function initClient() {
       return;
     }
 
+    if (typeof reserveForm.reportValidity === 'function' && !reserveForm.reportValidity()) {
+      formMsg.textContent = 'Rellena los campos obligatorios';
+      return;
+    }
+
     const pistaId = resPista.value;
     const name = document.getElementById('resName').value.trim();
     const phone = document.getElementById('resPhone').value.trim();
@@ -437,7 +442,7 @@ async function initClient() {
     const tipoCorte = getServiceLabel(serviceId);
     const date = dateInput.value;
 
-    if (!pistaId || !name || !startTime || !date || !serviceId || !Number.isFinite(durationMin)) {
+    if (!pistaId || !name || !phone || !email || !startTime || !date || !serviceId || !Number.isFinite(durationMin)) {
       formMsg.textContent = 'Rellena los campos obligatorios';
       return;
     }
