@@ -356,17 +356,17 @@ button {
 }
 
 .slot-btn {
-  border: none;
+  border: 1px solid transparent;
   border-radius: 16px;
   padding: 14px 16px;
-  background: #e2e8f0;
-  color: #0f172a;
+  background: #dcfce7;
+  color: #166534;
   font-weight: 600;
-  transition: background 0.2s, transform 0.2s;
+  transition: background 0.2s, transform 0.2s, border-color 0.2s;
 }
 
 .slot-btn:hover:not(:disabled) {
-  background: #0ea5e9;
+  background: #22c55e;
   color: #fff;
   transform: translateY(-2px);
 }
@@ -378,16 +378,18 @@ button {
 }
 
 .slot-btn.is-reserved {
-  background: rgba(148, 163, 184, 0.35);
-  color: #475569;
+  background: #d1d5db;
+  color: #1f2937;
+  border-color: rgba(100, 116, 139, 0.4);
   cursor: not-allowed;
 }
 
 .slot-btn.is-unavailable {
-  background: rgba(148, 163, 184, 0.25);
-  color: #64748b;
+  background: rgba(148, 163, 184, 0.35);
+  color: #475569;
+  border-color: rgba(148, 163, 184, 0.6);
+  border-style: dashed;
   cursor: not-allowed;
-  border: 1px dashed rgba(148, 163, 184, 0.6);
 }
 
 .selected-hour {
@@ -410,14 +412,18 @@ button {
   gap: 16px;
 }
 
-select option:disabled,
-select option.is-reserved {
+select option:disabled {
   color: #94a3b8;
   background-color: #e2e8f0;
 }
 
+select option.is-reserved {
+  color: #1f2937;
+  background-color: #d1d5db;
+}
+
 select option.is-unavailable {
-  color: #94a3b8;
+  color: #475569;
   background-color: #f8fafc;
   font-style: italic;
 }
