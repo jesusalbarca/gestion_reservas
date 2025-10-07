@@ -137,21 +137,35 @@ module.exports = {
     const db = await readDB();
     const meta = db.meta || {};
     return {
-      adminEmail: typeof meta.adminEmail === 'string' ? meta.adminEmail : ''
+      adminEmail: typeof meta.adminEmail === 'string' ? meta.adminEmail : '',
+      smtpPass: typeof meta.smtpPass === 'string' ? meta.smtpPass : ''
     };
   },
   async getAdminEmail() {
     const settings = await this.getSettings();
     return settings.adminEmail;
   },
-  async setAdminEmail(adminEmail) {
+  async setSettings(partial = {}) {
     const db = await readDB();
     db.meta = db.meta || {};
-    db.meta.adminEmail = typeof adminEmail === 'string' ? adminEmail.trim() : '';
+    if (Object.prototype.hasOwnProperty.call(partial, 'adminEmail')) {
+      db.meta.adminEmail = typeof partial.adminEmail === 'string'
+        ? partial.adminEmail.trim()
+        : '';
+    }
+    if (Object.prototype.hasOwnProperty.call(partial, 'smtpPass')) {
+      db.meta.smtpPass = typeof partial.smtpPass === 'string'
+        ? partial.smtpPass
+        : '';
+    }
     await writeDB(db);
     return {
-      adminEmail: db.meta.adminEmail
+      adminEmail: typeof db.meta.adminEmail === 'string' ? db.meta.adminEmail : '',
+      smtpPass: typeof db.meta.smtpPass === 'string' ? db.meta.smtpPass : ''
     };
+  },
+  async setAdminEmail(adminEmail) {
+    return this.setSettings({ adminEmail });
   },
   async raw() {
     return await readDB();
