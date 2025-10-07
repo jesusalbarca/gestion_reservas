@@ -35,12 +35,19 @@ const MAX_DURATION = 180;
 
 const DURATION_STEP = 15;
 
+const EMAIL_NOTIFICATIONS_ENABLED = process.env.EMAIL_NOTIFICATIONS_ENABLED !== 'false';
 const SMTP_HOST = process.env.SMTP_HOST || '';
 const SMTP_PORT = Number(process.env.SMTP_PORT) || 587;
 const SMTP_SECURE = process.env.SMTP_SECURE === 'true';
 const SMTP_USER = process.env.SMTP_USER || '';
 const SMTP_PASS = process.env.SMTP_PASS || '';
+const SMTP_CONNECTION_TIMEOUT = Number(process.env.SMTP_CONNECTION_TIMEOUT) || 0;
+const SMTP_GREETING_TIMEOUT = Number(process.env.SMTP_GREETING_TIMEOUT) || 0;
+const SMTP_SOCKET_TIMEOUT = Number(process.env.SMTP_SOCKET_TIMEOUT) || 0;
+const SMTP_ALLOW_INVALID_CERTS = process.env.SMTP_ALLOW_INVALID_CERTS === 'true';
 const MAIL_FROM = process.env.MAIL_FROM || (SMTP_USER || 'reservas@example.com');
+
+let emailNotificationsDisabledLogged = false;
 
 let mailTransport = null;
 let mailTransportInitPromise = null;
@@ -51,12 +58,34 @@ function resetMailTransport() {
 }
 
 async function buildMailTransport() {
+  if (!EMAIL_NOTIFICATIONS_ENABLED) {
+    if (!emailNotificationsDisabledLogged) {
+      console.warn('Notificaciones por email deshabilitadas por EMAIL_NOTIFICATIONS_ENABLED=false');
+      emailNotificationsDisabledLogged = true;
+    }
+    return null;
+  }
   if (!SMTP_HOST) return null;
   const transportConfig = {
     host: SMTP_HOST,
     port: SMTP_PORT,
     secure: SMTP_SECURE
   };
+  if (SMTP_CONNECTION_TIMEOUT > 0) {
+    transportConfig.connectionTimeout = SMTP_CONNECTION_TIMEOUT;
+  }
+  if (SMTP_GREETING_TIMEOUT > 0) {
+    transportConfig.greetingTimeout = SMTP_GREETING_TIMEOUT;
+  }
+  if (SMTP_SOCKET_TIMEOUT > 0) {
+    transportConfig.socketTimeout = SMTP_SOCKET_TIMEOUT;
+  }
+  if (SMTP_ALLOW_INVALID_CERTS) {
+    transportConfig.tls = {
+      ...(transportConfig.tls || {}),
+      rejectUnauthorized: false
+    };
+  }
   if (SMTP_USER) {
     let password = SMTP_PASS;
     if (!password) {
@@ -78,6 +107,13 @@ async function buildMailTransport() {
 }
 
 async function getMailTransport() {
+  if (!EMAIL_NOTIFICATIONS_ENABLED) {
+    if (!emailNotificationsDisabledLogged) {
+      console.warn('Notificaciones por email deshabilitadas por EMAIL_NOTIFICATIONS_ENABLED=false');
+      emailNotificationsDisabledLogged = true;
+    }
+    return null;
+  }
   if (!SMTP_HOST) return null;
   if (mailTransport) return mailTransport;
   if (!mailTransportInitPromise) {
@@ -426,6 +462,9 @@ async function sendReservationNotifications(reserva) {
     }).catch(err => {
 
       console.error('Error enviando email a', msg.to, err);
+      if (err && (err.code === 'ETIMEDOUT' || err.code === 'ECONNECTION' || err.command === 'CONN')) {
+        resetMailTransport();
+      }
 
     }));
 
