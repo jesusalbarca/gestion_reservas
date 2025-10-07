@@ -378,8 +378,8 @@ button {
 }
 
 .slot-btn.is-reserved {
-  background: rgba(148, 163, 184, 0.35);
-  color: #475569;
+  background: rgba(248, 113, 113, 0.2);
+  color: #b91c1c;
   cursor: not-allowed;
 }
 
