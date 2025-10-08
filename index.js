@@ -348,7 +348,10 @@ async function sendReservationNotifications(reserva) {
 
   const transport = await getMailTransport();
 
-  if (!transport) return;
+  if (!transport) {
+    console.info('[reservas] Notificaciones de reserva omitidas: transporte SMTP no disponible');
+    return;
+  }
 
   try {
 
@@ -416,7 +419,9 @@ async function sendReservationNotifications(reserva) {
 
         text: userText,
 
-        html: userHtml
+        html: userHtml,
+
+        metaType: 'user'
 
       });
 
@@ -446,7 +451,9 @@ async function sendReservationNotifications(reserva) {
 
         subject: `Nueva reserva - ${serviceLabel} (${dateLabel} ${startLabel})`,
 
-        text: adminText
+        text: adminText,
+
+        metaType: 'admin'
 
       });
 
@@ -454,20 +461,58 @@ async function sendReservationNotifications(reserva) {
 
     if (!messages.length) return;
 
-    const sendOps = messages.map(msg => transport.sendMail({
+    const sendOps = messages.map(msg => {
 
-      from: MAIL_FROM,
+      if (msg.metaType === 'admin') {
 
-      ...msg
+        console.info('[reservas] Enviando correo de notificacion a administrador', {
 
-    }).catch(err => {
+          to: msg.to,
 
-      console.error('Error enviando email a', msg.to, err);
-      if (err && (err.code === 'ETIMEDOUT' || err.code === 'ECONNECTION' || err.command === 'CONN')) {
-        resetMailTransport();
+          subject: msg.subject
+
+        });
+
+      } else if (msg.metaType === 'user') {
+
+        console.info('[reservas] Enviando correo de confirmacion a usuario', {
+
+          to: msg.to,
+
+          subject: msg.subject
+
+        });
+
+      } else {
+
+        console.info('[reservas] Enviando correo de reserva', {
+
+          to: msg.to,
+
+          subject: msg.subject
+
+        });
+
       }
 
-    }));
+      const { metaType, ...mailPayload } = msg;
+
+      return transport.sendMail({
+
+        from: MAIL_FROM,
+
+        ...mailPayload
+
+      }).catch(err => {
+
+        console.error('Error enviando email a', msg.to, err);
+        if (err && (err.code === 'ETIMEDOUT' || err.code === 'ECONNECTION' || err.command === 'CONN')) {
+          resetMailTransport();
+        }
+
+      });
+
+    });
 
     await Promise.all(sendOps);
 
@@ -520,6 +565,16 @@ app.post('/api/reservas', async (req, res) => {
   try {
 
     const { pistaId, date, startTime, durationMin, nombre, telefono, email, servicioId, tipoCorte } = req.body;
+    console.info('[reservas] Solicitud de nueva reserva recibida', {
+      pistaId,
+      date,
+      startTime,
+      durationMin,
+      nombre,
+      telefono,
+      servicioId,
+      tipoCorte
+    });
 
     const pistaIdValue = typeof pistaId === 'string' ? pistaId.trim() : pistaId;
 
@@ -613,6 +668,16 @@ app.post('/api/reservas', async (req, res) => {
 
       timezone: FACILITY_TZ
 
+    });
+
+    console.info('[reservas] Reserva creada correctamente', {
+      reservaId: reserva.id,
+      pistaId: reserva.pistaId,
+      date: reserva.date,
+      startTime: reserva.startTime,
+      durationMin: reserva.durationMin,
+      nombre: reserva.nombre,
+      telefono: reserva.telefono
     });
 
     res.status(201).json(reserva);
