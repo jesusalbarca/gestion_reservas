@@ -224,7 +224,7 @@ function getTimeZoneOffsetMinutes(date, timeZone) {
 
   if (!tzPart) return 0;
 
-  const match = tzPart.value.match(/GMT([+-]\d{2})(?::?(\d{2}))?/);
+  const match = tzPart.value.match(/GMT([+-]\d{1,2})(?::?(\d{2}))?/);
 
   if (!match) return 0;
 
