@@ -427,10 +427,7 @@ async function sendReservationNotifications(reserva) {
 
     }
 
-    const trimmedAdminEmail = typeof adminEmail === 'string' ? adminEmail.trim() : '';
-    const isDemoAdminEmail = trimmedAdminEmail.toLowerCase() === 'admin@demo.local';
-
-    if (isValidEmail(trimmedAdminEmail) && !isDemoAdminEmail) {
+    if (isValidEmail(adminEmail)) {
 
       const adminText = [
 
@@ -450,7 +447,7 @@ async function sendReservationNotifications(reserva) {
 
       messages.push({
 
-        to: trimmedAdminEmail,
+        to: adminEmail.trim(),
 
         subject: `Nueva reserva - ${serviceLabel} (${dateLabel} ${startLabel})`,
 
@@ -460,8 +457,6 @@ async function sendReservationNotifications(reserva) {
 
       });
 
-    } else if (isDemoAdminEmail) {
-      console.info('[reservas] Correo admin omitido: admin@demo.local es solo para demo');
     }
 
     if (!messages.length) return;
