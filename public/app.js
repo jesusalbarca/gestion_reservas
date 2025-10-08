@@ -45,7 +45,7 @@ function getTimeZoneOffsetMinutes(date, timeZone) {
   const parts = dtf.formatToParts(date);
   const tzPart = parts.find(part => part.type === 'timeZoneName');
   if (!tzPart) return 0;
-  const match = tzPart.value.match(/GMT([+-]\d{2})(?::?(\d{2}))?/);
+  const match = tzPart.value.match(/GMT([+-]\d{1,2})(?::?(\d{2}))?/);
   if (!match) return 0;
   const sign = match[1][0] === '-' ? -1 : 1;
   const hours = parseInt(match[1].slice(1), 10);
