@@ -758,6 +758,14 @@ app.delete('/api/admin/reservas/pasadas', async (req, res) => {
   const todayIso = getTodayIsoDate(FACILITY_TZ);
 
   const result = await db.deleteReservasBeforeDate(todayIso, FACILITY_TZ);
+  const removed = Number(result && result.removed) || 0;
+  if (removed > 0) {
+    console.info('[reservas] Reservas pasadas eliminadas', {
+      removed,
+      cutoffDate: todayIso,
+      facilityTz: FACILITY_TZ
+    });
+  }
 
   res.json(result);
 
