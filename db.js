@@ -100,6 +100,13 @@ module.exports = {
         return newStart < r.end && newEnd > r.start;
       });
       if (conflicts.length > 0) {
+        console.warn('[reservas] Conflicto detectado al crear reserva', {
+          pistaId,
+          date,
+          startISO: newStart,
+          endISO: newEnd,
+          conflictIds: conflicts.map(r => r.id)
+        });
         const err = new Error('Conflicto de reserva (solapamiento) con otra reserva en la misma pista.');
         err.code = 'CONFLICT';
         throw err;
