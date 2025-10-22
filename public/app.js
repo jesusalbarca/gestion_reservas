@@ -86,6 +86,19 @@ function formatFacilityDateTime(iso) {
   }).format(new Date(iso));
 }
 
+function isValidPhone(phone) {
+  if (typeof phone !== 'string') return false;
+  const trimmed = phone.trim();
+  if (!trimmed) return false;
+  if (!/^\+?[0-9\s-]+$/.test(trimmed)) return false;
+  const digits = trimmed.replace(/\D/g, '');
+  if (digits.length < 9 || digits.length > 15) return false;
+  if (trimmed.includes('+') && !trimmed.startsWith('+')) return false;
+  const plusMatches = trimmed.match(/\+/g);
+  if (plusMatches && plusMatches.length > 1) return false;
+  return true;
+}
+
 function buildClientConfig(rawConfig = {}) {
   const parsedStart = Number(rawConfig.startMinutes);
   const parsedEnd = Number(rawConfig.endMinutes);
@@ -442,7 +455,17 @@ async function initClient() {
     const tipoCorte = getServiceLabel(serviceId);
     const date = dateInput.value;
 
-    if (!pistaId || !name || !phone || !email || !startTime || !date || !serviceId || !Number.isFinite(durationMin)) {
+    if (!phone) {
+      formMsg.textContent = 'El telefono es obligatorio.';
+      return;
+    }
+
+    if (!isValidPhone(phone)) {
+      formMsg.textContent = 'Telefono invalido. Debe contener entre 9 y 15 digitos y puede incluir +, espacios o guiones.';
+      return;
+    }
+
+    if (!pistaId || !name || !email || !startTime || !date || !serviceId || !Number.isFinite(durationMin)) {
       formMsg.textContent = 'Rellena los campos obligatorios';
       return;
     }
