@@ -492,7 +492,16 @@ async function initClient() {
       } else {
         const err = await resp.json().catch(() => ({}));
         if (resp.status === 409) {
-          formMsg.textContent = err?.error || 'La hora seleccionada ya no está disponible.';
+          const conflictMessage = err?.error || 'La hora seleccionada ya no está disponible.';
+          formMsg.textContent = conflictMessage;
+          console.warn('[reservas] Conflicto de reserva mostrado al usuario', {
+            pistaId,
+            date,
+            startTime,
+            durationMin,
+            servicioId: serviceId,
+            mensaje: conflictMessage
+          });
           await loadCalendar();
           clearSelectedHour();
         } else {
