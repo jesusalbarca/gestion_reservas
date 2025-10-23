@@ -276,6 +276,30 @@ function isValidTime(time) {
 
 }
 
+function isValidPhone(phone) {
+
+  if (typeof phone !== 'string') return false;
+
+  const trimmed = phone.trim();
+
+  if (!trimmed) return false;
+
+  if (!/^\+?[0-9\s-]+$/.test(trimmed)) return false;
+
+  const digits = trimmed.replace(/\D/g, '');
+
+  if (digits.length < 9 || digits.length > 15) return false;
+
+  if (trimmed.includes('+') && !trimmed.startsWith('+')) return false;
+
+  const plusMatches = trimmed.match(/\+/g);
+
+  if (plusMatches && plusMatches.length > 1) return false;
+
+  return true;
+
+}
+
 function getTodayIsoDate(timeZone) {
 
   return new Intl.DateTimeFormat('en-CA', {
@@ -601,6 +625,18 @@ app.post('/api/reservas', async (req, res) => {
     if (!servicioIdValue) {
 
       return res.status(400).json({ error: 'Falta seleccionar el tipo de servicio.' });
+
+    }
+
+    if (typeof telefonoValue !== 'string' || !telefonoValue) {
+
+      return res.status(400).json({ error: 'El telefono es obligatorio.' });
+
+    }
+
+    if (!isValidPhone(telefonoValue)) {
+
+      return res.status(400).json({ error: 'Telefono invalido. Debe contener entre 9 y 15 digitos y puede incluir +, espacios o guiones.' });
 
     }
 

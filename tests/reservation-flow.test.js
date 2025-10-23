@@ -88,6 +88,51 @@ test('reserva API persiste email admin y crea reservas', async (t) => {
   assert.ok(reservasBody.some(r => r.id === reservaBody.id));
 });
 
+test('reserva API rechaza telefono invalido', async (t) => {
+  const originalDb = cloneDeep(await db.raw());
+  const server = startServer(0);
+  await once(server, 'listening');
+  const address = server.address();
+  const port = typeof address === 'object' && address ? address.port : 0;
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  t.after(async () => {
+    await new Promise(resolve => server.close(resolve));
+    await db.saveRaw(originalDb);
+  });
+
+  let pistaId;
+  const pistas = await db.getPistas();
+  if (pistas.length === 0) {
+    const nuevaPista = await db.addPista({ nombre: 'Pista Test Telefono', descripcion: 'Temporal' });
+    pistaId = nuevaPista.id;
+  } else {
+    pistaId = pistas[0].id;
+  }
+  assert.ok(pistaId, 'Debe existir alguna pista para crear reservas');
+
+  const invalidPayload = {
+    pistaId,
+    date: '2099-12-31',
+    startTime: '11:00',
+    durationMin: 60,
+    nombre: 'Test User',
+    telefono: 'invalid-phone',
+    email: 'user@example.com',
+    servicioId: 'test-service'
+  };
+
+  const resp = await fetch(`${baseUrl}/api/reservas`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(invalidPayload)
+  });
+
+  assert.strictEqual(resp.status, 400);
+  const body = await resp.json();
+  assert.strictEqual(body?.error, 'Telefono invalido. Debe contener entre 9 y 15 digitos y puede incluir +, espacios o guiones.');
+});
+
 test('admin puede eliminar reservas pasadas', async (t) => {
   const originalDb = cloneDeep(await db.raw());
   const workingDb = cloneDeep(originalDb);
